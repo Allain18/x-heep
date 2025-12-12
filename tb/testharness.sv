@@ -698,7 +698,9 @@ module testharness #(
         );
       end
       if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || core_v_mini_mcu_pkg::CpuType == cv32e20) && X_EXT != 0 && (QUADRILATERO != 0)) begin: gen_fpu_ss_wrapper
-        quadrilatero_wrapper matrix_wrapper_inst (
+        quadrilatero_wrapper #(
+            .MATRIX_FPU(0)
+        ) matrix_wrapper_inst (
             .clk_i,
             .rst_ni,
             // eXtension Interface
@@ -709,14 +711,14 @@ module testharness #(
             .xif_mem_result_if(ext_if),
             .xif_result_if    (ext_if),
             // OBI signals 
-            .matrix_cps_ch0_req_o (ext_master_req [testharness_pkg::EXT_MASTER4_IDX]),
-            .matrix_cps_ch0_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER4_IDX]),
-            .matrix_cps_ch1_req_o (ext_master_req [testharness_pkg::EXT_MASTER5_IDX]),
-            .matrix_cps_ch1_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER5_IDX]),
-            .matrix_cps_ch2_req_o (ext_master_req [testharness_pkg::EXT_MASTER6_IDX]),
-            .matrix_cps_ch2_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER6_IDX]),
-            .matrix_cps_ch3_req_o (ext_master_req [testharness_pkg::EXT_MASTER7_IDX]),
-            .matrix_cps_ch3_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER7_IDX])
+            .quadrilatero_ch0_req_o (ext_master_req [testharness_pkg::EXT_MASTER4_IDX]),
+            .quadrilatero_ch0_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER4_IDX]),
+            .quadrilatero_ch1_req_o (ext_master_req [testharness_pkg::EXT_MASTER5_IDX]),
+            .quadrilatero_ch1_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER5_IDX]),
+            .quadrilatero_ch2_req_o (ext_master_req [testharness_pkg::EXT_MASTER6_IDX]),
+            .quadrilatero_ch2_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER6_IDX]),
+            .quadrilatero_ch3_req_o (ext_master_req [testharness_pkg::EXT_MASTER7_IDX]),
+            .quadrilatero_ch3_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER7_IDX])
         );
       end
 

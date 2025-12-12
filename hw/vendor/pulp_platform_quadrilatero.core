@@ -23,7 +23,6 @@ filesets:
     - pulp_platform_quadrilatero/rtl/quadrilatero_ff_fs_dr_stage.sv
     - pulp_platform_quadrilatero/rtl/quadrilatero_fixed_prio_arbiter.sv
     - pulp_platform_quadrilatero/rtl/quadrilatero_lsu.sv
-    - pulp_platform_quadrilatero/rtl/quadrilatero_mac_float.sv
     - pulp_platform_quadrilatero/rtl/quadrilatero_mac_int.sv
     - pulp_platform_quadrilatero/rtl/quadrilatero_mesh.sv
     - pulp_platform_quadrilatero/rtl/quadrilatero_pe.sv

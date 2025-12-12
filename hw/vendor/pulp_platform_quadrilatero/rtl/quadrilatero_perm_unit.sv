@@ -59,7 +59,7 @@ module quadrilatero_perm_unit #(
   logic                           fifo_full          ;
   logic                           fifo_empty         ;
 
-  localparam int unsigned USAGE = DEPTH > 1 : $clog2(DEPTH)-1 : 0;
+  localparam int unsigned USAGE = DEPTH > 1 ? $clog2(DEPTH)-1 : 0;
   logic [USAGE:0] fifo_usage;
   logic           fifo_almost_full;
   //----------------------------------------------------------------------------------------------------------

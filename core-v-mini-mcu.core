@@ -77,7 +77,6 @@ filesets:
     depend:
     - x-heep::tb-utils
     - x-heep::tb-fpu-utils
-    - x-heep::tb-quadrilatero-utils
 
   files_verilator_waiver:
     depend:

@@ -22,7 +22,7 @@ module quadrilatero_register_lsu_controller #(
     output quadrilatero_pkg::lsu_conf_t issued_instr_conf_o  // issued instruction configuration
 );
 
-  localparam int unsigned USAGE = N_SLOTS > 1 : $clog2(N_SLOTS)-1 : 0;
+  localparam int unsigned USAGE = N_SLOTS > 1 ? $clog2(N_SLOTS)-1 : 0;
   logic issue_queue_empty;
   logic start_load;
   logic issue_queue_almost_full;
