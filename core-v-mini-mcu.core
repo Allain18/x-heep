@@ -77,6 +77,7 @@ filesets:
     depend:
     - x-heep::tb-utils
     - x-heep::tb-fpu-utils
+    - x-heep::tb-quadrilatero-utils
 
   files_verilator_waiver:
     depend:
@@ -203,6 +204,12 @@ parameters:
     paramtype: vlogparam
     description: |
       Enables RV32Zfinx RISC-V extensions. Admitted values: 1|0.
+    default: 0
+  QUADRILATERO:
+    datatype: int
+    paramtype: vlogparam
+    description: |
+      Enables Matrix custom RISC-V extensions. Admitted values: 1|0.
     default: 0
   JTAG_DPI:
     datatype: int
@@ -345,6 +352,7 @@ targets:
     - COREV_PULP
     - FPU
     - ZFINX
+    - QUADRILATERO
     - JTAG_DPI
     - X_EXT
     - USE_EXTERNAL_DEVICE_EXAMPLE

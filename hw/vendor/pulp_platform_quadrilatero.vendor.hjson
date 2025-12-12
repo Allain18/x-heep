@@ -1,0 +1,16 @@
+// Copyright 2025 Davide Schiavone
+// Solderpad Hardware License, Version 2.1, see LICENSE.md for details.
+// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+{
+  name: "pulp_platform_quadrilatero",
+  target_dir: "pulp_platform_quadrilatero",
+
+  upstream: {
+    url: "https://github.com/pulp-platform/quadrilatero.git",
+    rev: "64165fab973cc3332a2452c05fc8db1eea6ff076",
+  },
+
+  exclude_from_upstream: [
+    ".gitmodules",
+  ]
+}
