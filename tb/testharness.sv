@@ -704,20 +704,20 @@ module testharness #(
             .clk_i,
             .rst_ni,
             // eXtension Interface
-            .xif_compressed_if(ext_if),
-            .xif_issue_if     (ext_if),
-            .xif_commit_if    (ext_if),
-            .xif_mem_if       (ext_if),
-            .xif_mem_result_if(ext_if),
-            .xif_result_if    (ext_if),
+            .xif_compressed_if      (ext_if),
+            .xif_issue_if           (ext_if),
+            .xif_commit_if          (ext_if),
+            .xif_mem_if             (ext_if),
+            .xif_mem_result_if      (ext_if),
+            .xif_result_if          (ext_if),
             // OBI signals 
-            .quadrilatero_ch0_req_o (ext_master_req [testharness_pkg::EXT_MASTER4_IDX]),
+            .quadrilatero_ch0_req_o (ext_master_req[testharness_pkg::EXT_MASTER4_IDX]),
             .quadrilatero_ch0_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER4_IDX]),
-            .quadrilatero_ch1_req_o (ext_master_req [testharness_pkg::EXT_MASTER5_IDX]),
+            .quadrilatero_ch1_req_o (ext_master_req[testharness_pkg::EXT_MASTER5_IDX]),
             .quadrilatero_ch1_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER5_IDX]),
-            .quadrilatero_ch2_req_o (ext_master_req [testharness_pkg::EXT_MASTER6_IDX]),
+            .quadrilatero_ch2_req_o (ext_master_req[testharness_pkg::EXT_MASTER6_IDX]),
             .quadrilatero_ch2_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER6_IDX]),
-            .quadrilatero_ch3_req_o (ext_master_req [testharness_pkg::EXT_MASTER7_IDX]),
+            .quadrilatero_ch3_req_o (ext_master_req[testharness_pkg::EXT_MASTER7_IDX]),
             .quadrilatero_ch3_resp_i(ext_master_resp[testharness_pkg::EXT_MASTER7_IDX])
         );
       end
