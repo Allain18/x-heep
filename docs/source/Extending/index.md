@@ -40,7 +40,7 @@ First, install the compiler as written [here](https://github.com/esl-epfl/xheep_
 ```
 make mcu-gen BUS=NtoM MEMORY_BANKS_IL=4
 make verilator-build FUSESOC_PARAM="--X_EXT=1 --QUADRILATERO=1"
-make app PROJECT=example_matmul_quadrilatero ARCH=-march=rv32imc_xtheadmatrix0p1 COMPILER_FLAGS=-menable-experimental-extensions
+make app PROJECT=example_matmul_quadrilatero ARCH=rv32imc_xtheadmatrix0p1 COMPILER_FLAGS=-menable-experimental-extensions
 make verilator-run
 ```
 
