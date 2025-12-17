@@ -266,7 +266,8 @@ module cve2_id_stage #(
   logic [31:0] alu_operand_b;
 
   // CV-X-IF
-  logic stall_coproc;
+  logic stall_coproc, wait_x_scoreboard;
+  logic x_issue_valid_pre_scoreboard;
 
   ///////////////
   // ID-EX FSM //
@@ -287,20 +288,51 @@ module cve2_id_stage #(
   if (XInterface) begin: gen_xif
 
     logic coproc_done;
-    logic [X_IF_INSTR_INFLIGHT-1:0] scoreboard_d, scoreboard_q;
-    id_t x_instr_id_n, x_instr_id_q;
+    logic [X_INSTR_INFLIGHT-1:0] scoreboard_d, scoreboard_q;
+    id_t x_instr_id_d, x_instr_id_q;
 
     logic scoreboard_full;
-    logic x_issue_valid_pre_scoreboard;
 
-    assign scoreboard_full = scoreboard_q[X_IF_INSTR_INFLIGHT-1];
+    typedef enum logic { SCOREBOARD_NOT_FULL, WAIT_SCOREBOARD_EMPTY } x_if_scoreboard_fsm_e;
+    x_if_scoreboard_fsm_e x_wait_scoreboard_fsm_d, x_wait_scoreboard_fsm_q;
+
+    //wait_x_scoreboard is set by the multicycle cve2 FSM when x_issue would be valid but the scoreboard is full
+    //in this case we have a structural hazard - thus we wait that all the instructions inflight return (i.e. scoreboard_q == '0)
+    //this is suboptimal as we would not needed to wait all the instructions to return, but simplifies the core.
+    //until this FSM remains in the WAIT_SCOREBOARD_EMPTY state, the coproc_done (and thus the multicycle_done) signal 
+    //are kept to 0, thus the multicycle cve2 FSM remains in the MULTI_CYCLE state.
+    //This FSM would be ideally merged into that FSM, but to keep legacy code stable, the FSM has been moved outside
+    //to not add any new state or sticky flip-flops.
+    always_comb begin
+      x_wait_scoreboard_fsm_d = x_wait_scoreboard_fsm_q;
+      unique case (x_wait_scoreboard_fsm_q)
+        SCOREBOARD_NOT_FULL: begin
+          if (wait_x_scoreboard) begin
+            x_wait_scoreboard_fsm_d = WAIT_SCOREBOARD_EMPTY;
+          end
+        end
+        WAIT_SCOREBOARD_EMPTY: begin
+          if (scoreboard_q == '0) begin
+            x_wait_scoreboard_fsm_d = SCOREBOARD_NOT_FULL;
+          end
+        end
+        default: begin
+          x_wait_scoreboard_fsm_d   = SCOREBOARD_NOT_FULL;
+        end
+      endcase
+    end
+
+    //when offloading the last one, we say the scoreboard is full
+    //this is done to keep the core simple, thus even if another ID would be free
+    //we only offload instructions linearly
+    assign scoreboard_full = scoreboard_q[X_INSTR_INFLIGHT-1];
 
     always_comb begin
-      assign scoreboard_n = scoreboard_q;
-      assign x_instr_id_n = x_instr_id_q;
+      scoreboard_d = scoreboard_q;
+      x_instr_id_d = x_instr_id_q;
       if (x_issue_valid_o && x_issue_ready_i && x_issue_resp_i.accept) begin
         scoreboard_d[x_instr_id_q] = 1'b1;
-        x_instr_id_n = x_instr_id_q + 1'b1;
+        x_instr_id_d = x_instr_id_q + 1'b1;
       end
       if (x_result_valid_i) begin
         scoreboard_d[x_result_i.id] = 1'b0;
@@ -311,16 +343,17 @@ module cve2_id_stage #(
       if (!rst_ni) begin
         scoreboard_q <= '0;
         x_instr_id_q <= '0;
+        x_wait_scoreboard_fsm_q <= SCOREBOARD_NOT_FULL;
       end else begin
-        scoreboard_q <= scoreboard_n;
-        x_instr_id_q <= x_instr_id_n;
+        scoreboard_q <= scoreboard_d;
+        x_instr_id_q <= x_instr_id_d;
+        x_wait_scoreboard_fsm_q <= x_wait_scoreboard_fsm_d;
       end
     end
 
     assign multicycle_done = lsu_req_dec ? lsu_resp_valid_i : (illegal_insn_dec ? coproc_done : ex_valid_i);
 
-    always_comb
-    begin
+    always_comb begin
       if (x_wait_scoreboard_fsm_q == WAIT_SCOREBOARD_EMPTY)
         coproc_done = 1'b0;
       else
@@ -367,6 +400,7 @@ module cve2_id_stage #(
     assign unused_x_issue_ready = x_issue_ready_i;
     assign x_issue_req_o        = '0;
     assign unused_x_issue_resp  = x_issue_resp_i;
+    assign x_issue_valid_pre_scoreboard = 1'b0;
 
     // Register Interface
     assign x_register_o = '0;
@@ -747,26 +781,6 @@ module cve2_id_stage #(
   // MULTI_CYCLE if it requires multiple cycles to complete regardless of stalls and other
   // considerations. An instruction may be held in FIRST_CYCLE if it's unable to begin executing
   // (this is controlled by instr_executing).
-
-  always_comb begin
-    x_wait_scoreboard_fsm_d = x_wait_scoreboard_fsm_q;
-    unique case (x_wait_scoreboard_fsm_q)
-      SCOREBOARD_NOT_FULL: begin
-        if (wait_x_scoreboard) begin
-          x_wait_scoreboard_fsm_d = WAIT_SCOREBOARD_EMPTY;
-        end
-      end
-      WAIT_SCOREBOARD_EMPTY: begin
-        if (&scoreboard_q == 1'b0) begin
-          x_wait_scoreboard_fsm_d = SCOREBOARD_NOT_FULL;
-        end
-      end
-      default: begin
-        x_wait_scoreboard_fsm_d   = SCOREBOARD_NOT_FULL;
-      end
-    endcase
-  end
-
   always_comb begin
     id_fsm_d                = id_fsm_q;
     rf_we_raw               = rf_we_dec;
