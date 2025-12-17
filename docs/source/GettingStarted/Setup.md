@@ -146,7 +146,7 @@ cmake --build build --target install # or ninja -C build install
 
 By default, when compiling an application with Clang, X-HEEP will link with the LLD linker.
 If you want to use the GCC linker, you will need to pass to the `make app` target the
-`CLANG_LINKER_USE_GCC=1` option.
+`CLANG_LINKER_USE_LD=1` option.
 
 ### 4. Install Verilator:
 
