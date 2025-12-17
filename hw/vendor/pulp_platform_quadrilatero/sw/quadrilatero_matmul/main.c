@@ -16,6 +16,10 @@
 #define PRINTF_IN_FPGA  1
 #define PRINTF_IN_SIM   0
 
+/* VCD Files generation */
+// Supported Values: 0 (No), 1 (Yes)
+#define VCD_ENABLE 0
+
 // ************************************************************************************************************
 // *****************************                                                  *****************************
 // *****************************            DO NOT TOUCH LINES BELOW !            *****************************
@@ -28,6 +32,7 @@
 #include "csr.h"
 #include "x-heep.h"
 #include "gpio.h"
+#include "vcd_util.h"
 
 /* Define Datatype and set of data */
 #if TYPE == 0
@@ -104,6 +109,14 @@ uint32_t check_results(int K, int N, int M);
 #else 
 #endif
 
+/* VCD Functions */
+#if VCD_ENABLE == 1
+    #define VCD_START()  vcd_init(); vcd_enable()
+    #define VCD_STOP()   vcd_disable()
+#else
+    #define VCD_START()  
+    #define VCD_STOP()  
+#endif
 
 /* Matrices */
 #define MAT_A       matrix_A
@@ -137,7 +150,12 @@ int main()
     CSR_WRITE(CSR_REG_MCYCLE, 0);
 
     //execute the kernel
+    // vcd_init();
+    // vcd_enable();
+    VCD_START();
     MATRIX_MUL(addrA,addrB,addrC,K_size,N_size,M_size,SIMD_SHIFT);
+    VCD_STOP();
+    // vcd_disable();
 
     //read mcycle csr
     CSR_READ(CSR_REG_MCYCLE, &cycles);
