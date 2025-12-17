@@ -287,27 +287,64 @@ module cve2_id_stage #(
   if (XInterface) begin: gen_xif
 
     logic coproc_done;
+    logic [X_IF_INSTR_INFLIGHT-1:0] scoreboard_d, scoreboard_q;
+    id_t x_instr_id_n, x_instr_id_q;
+
+    logic scoreboard_full;
+    logic x_issue_valid_pre_scoreboard;
+
+    assign scoreboard_full = scoreboard_q[X_IF_INSTR_INFLIGHT-1];
+
+    always_comb begin
+      assign scoreboard_n = scoreboard_q;
+      assign x_instr_id_n = x_instr_id_q;
+      if (x_issue_valid_o && x_issue_ready_i && x_issue_resp_i.accept) begin
+        scoreboard_d[x_instr_id_q] = 1'b1;
+        x_instr_id_n = x_instr_id_q + 1'b1;
+      end
+      if (x_result_valid_i) begin
+        scoreboard_d[x_result_i.id] = 1'b0;
+      end
+    end
+
+    always_ff @(posedge clk_i or negedge rst_ni) begin : x_scoreboard
+      if (!rst_ni) begin
+        scoreboard_q <= '0;
+        x_instr_id_q <= '0;
+      end else begin
+        scoreboard_q <= scoreboard_n;
+        x_instr_id_q <= x_instr_id_n;
+      end
+    end
+
     assign multicycle_done = lsu_req_dec ? lsu_resp_valid_i : (illegal_insn_dec ? coproc_done : ex_valid_i);
 
-    assign coproc_done = (x_issue_valid_o & x_issue_ready_i & ~x_issue_resp_i.writeback) | (x_result_valid_i & x_result_i.we);
+    always_comb
+    begin
+      if (x_wait_scoreboard_fsm_q == WAIT_SCOREBOARD_EMPTY)
+        coproc_done = 1'b0;
+      else
+        coproc_done = (x_issue_valid_o & x_issue_ready_i & ~x_issue_resp_i.writeback) | (x_result_valid_i & x_result_i.we);
+    end
 
     // Issue Interface
-    assign x_issue_valid_o      = instr_executing & illegal_insn_dec & (id_fsm_q == FIRST_CYCLE);
+    assign x_issue_valid_pre_scoreboard = instr_executing & illegal_insn_dec & (id_fsm_q == FIRST_CYCLE);
+    assign x_issue_valid_o      = x_issue_valid_pre_scoreboard & (~scoreboard_full);
     assign x_issue_req_o.instr  = instr_rdata_i;
-    assign x_issue_req_o.id     = '0;
+    assign x_issue_req_o.id     = x_instr_id_q;
     assign x_issue_req_o.hartid = hart_id_i;
 
     // Register Interface
     assign x_register_o.rs[0]    = rf_rdata_a_fwd;
     assign x_register_o.rs[1]    = rf_rdata_b_fwd;
     assign x_register_o.rs_valid = '1;
-    assign x_register_o.id       = '0;
+    assign x_register_o.id       = x_instr_id_q;
     assign x_register_o.hartid   = hart_id_i;
 
     // Commit Interface
     assign x_commit_valid_o       = 1'b1;
     assign x_commit_o.commit_kill = 1'b0;
-    assign x_commit_o.id          = '0;
+    assign x_commit_o.id          = x_instr_id_q;
     assign x_commit_o.hartid      = hart_id_i;
 
     // Result Interface
@@ -712,6 +749,25 @@ module cve2_id_stage #(
   // (this is controlled by instr_executing).
 
   always_comb begin
+    x_wait_scoreboard_fsm_d = x_wait_scoreboard_fsm_q;
+    unique case (x_wait_scoreboard_fsm_q)
+      SCOREBOARD_NOT_FULL: begin
+        if (wait_x_scoreboard) begin
+          x_wait_scoreboard_fsm_d = WAIT_SCOREBOARD_EMPTY;
+        end
+      end
+      WAIT_SCOREBOARD_EMPTY: begin
+        if (&scoreboard_q == 1'b0) begin
+          x_wait_scoreboard_fsm_d = SCOREBOARD_NOT_FULL;
+        end
+      end
+      default: begin
+        x_wait_scoreboard_fsm_d   = SCOREBOARD_NOT_FULL;
+      end
+    endcase
+  end
+
+  always_comb begin
     id_fsm_d                = id_fsm_q;
     rf_we_raw               = rf_we_dec;
     stall_multdiv           = 1'b0;
@@ -722,6 +778,7 @@ module cve2_id_stage #(
     branch_set_raw_d        = 1'b0;
     jump_set_raw            = 1'b0;
     perf_branch_o           = 1'b0;
+    wait_x_scoreboard       = 1'b0;
 
     if (instr_executing_spec) begin
       unique case (id_fsm_q)
@@ -778,6 +835,11 @@ module cve2_id_stage #(
                   else begin
                     id_fsm_d = FIRST_CYCLE;
                   end
+                end
+                else if (x_issue_valid_pre_scoreboard && x_issue_ready_i) begin
+                  id_fsm_d = MULTI_CYCLE;
+                  stall_coproc = 1'b1;
+                  wait_x_scoreboard = 1'b1;
                 end
                 else begin
                   stall_coproc = 1'b1;
