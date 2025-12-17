@@ -356,6 +356,8 @@ module cve2_id_stage #(
     always_comb begin
       if (x_wait_scoreboard_fsm_q == WAIT_SCOREBOARD_EMPTY)
         coproc_done = 1'b0;
+      else if (scoreboard_q == '0)
+        coproc_done = 1'b1;
       else
         coproc_done = (x_issue_valid_o & x_issue_ready_i & ~x_issue_resp_i.writeback) | (x_result_valid_i & x_result_i.we);
     end
