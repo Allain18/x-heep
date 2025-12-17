@@ -34,11 +34,42 @@ make verilator-run
 
 If you want to try [Quadrilatero](https://github.com/pulp-platform/quadrilatero), the custom matrix ISA extensions, you can use any of the cores as the co-processor has its own load/store unit.
 
-First, install the compiler as written [here](https://github.com/esl-epfl/xheep_matrix_spec/blob/main/BUILDING.md), then:
+First, install the compiler as written [here](https://github.com/esl-epfl/xheep_matrix_spec/blob/main/BUILDING.md), then, configure X-HEEP to have:
+
+```
+    bus_type: "NtoM"
+    ram_banks: {
+        code_and_data: {
+            num: 3
+            sizes: [32]
+        }
+        data_interleaved: {
+            auto_section: auto
+            // the name is used by example_matadd_interleaved as .xheep_data_interleaved
+            type: interleaved
+            num: 4
+            size: 16
+        }
+    }
+
+    linker_sections:
+    [
+        {
+            name: code
+            start: 0
+            #minimum size for freeRTOS and clang
+            size: 0x00000F800
+        }
+        {
+            name: data
+            start: 0x00000F800
+        }
+    ]
+```
 
 
 ```
-make mcu-gen BUS=NtoM MEMORY_BANKS_IL=4
+make mcu-gen (make sure you pass the configuration file set above)
 make verilator-build FUSESOC_PARAM="--X_EXT=1 --QUADRILATERO=1"
 make app PROJECT=example_matmul_quadrilatero ARCH=rv32imc_zicsr_xtheadmatrix0p1 COMPILER_FLAGS=-menable-experimental-extensions COMPILER=clang CLANG_LINKER_USE_LD=1
 make verilator-run
