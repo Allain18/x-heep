@@ -266,8 +266,7 @@ module cve2_id_stage #(
   logic [31:0] alu_operand_b;
 
   // CV-X-IF
-  logic stall_coproc, wait_x_scoreboard;
-  logic x_issue_valid_pre_scoreboard;
+  logic stall_coproc;
 
   ///////////////
   // ID-EX FSM //
@@ -291,41 +290,9 @@ module cve2_id_stage #(
     logic [X_INSTR_INFLIGHT-1:0] scoreboard_d, scoreboard_q;
     id_t x_instr_id_d, x_instr_id_q;
 
-    logic scoreboard_full;
+    logic scoreboard_free;
 
-    typedef enum logic { SCOREBOARD_NOT_FULL, WAIT_SCOREBOARD_EMPTY } x_if_scoreboard_fsm_e;
-    x_if_scoreboard_fsm_e x_wait_scoreboard_fsm_d, x_wait_scoreboard_fsm_q;
-
-    //wait_x_scoreboard is set by the multicycle cve2 FSM when x_issue would be valid but the scoreboard is full
-    //in this case we have a structural hazard - thus we wait that all the instructions inflight return (i.e. scoreboard_q == '0)
-    //this is suboptimal as we would not needed to wait all the instructions to return, but simplifies the core.
-    //until this FSM remains in the WAIT_SCOREBOARD_EMPTY state, the coproc_done (and thus the multicycle_done) signal 
-    //are kept to 0, thus the multicycle cve2 FSM remains in the MULTI_CYCLE state.
-    //This FSM would be ideally merged into that FSM, but to keep legacy code stable, the FSM has been moved outside
-    //to not add any new state or sticky flip-flops.
-    always_comb begin
-      x_wait_scoreboard_fsm_d = x_wait_scoreboard_fsm_q;
-      unique case (x_wait_scoreboard_fsm_q)
-        SCOREBOARD_NOT_FULL: begin
-          if (wait_x_scoreboard) begin
-            x_wait_scoreboard_fsm_d = WAIT_SCOREBOARD_EMPTY;
-          end
-        end
-        WAIT_SCOREBOARD_EMPTY: begin
-          if (scoreboard_q == '0) begin
-            x_wait_scoreboard_fsm_d = SCOREBOARD_NOT_FULL;
-          end
-        end
-        default: begin
-          x_wait_scoreboard_fsm_d   = SCOREBOARD_NOT_FULL;
-        end
-      endcase
-    end
-
-    //when offloading the last one, we say the scoreboard is full
-    //this is done to keep the core simple, thus even if another ID would be free
-    //we only offload instructions linearly
-    assign scoreboard_full = scoreboard_q[X_INSTR_INFLIGHT-1];
+    assign scoreboard_free = ~scoreboard_q[x_instr_id_q];
 
     always_comb begin
       scoreboard_d = scoreboard_q;
@@ -343,28 +310,18 @@ module cve2_id_stage #(
       if (!rst_ni) begin
         scoreboard_q <= '0;
         x_instr_id_q <= '0;
-        x_wait_scoreboard_fsm_q <= SCOREBOARD_NOT_FULL;
       end else begin
         scoreboard_q <= scoreboard_d;
         x_instr_id_q <= x_instr_id_d;
-        x_wait_scoreboard_fsm_q <= x_wait_scoreboard_fsm_d;
       end
     end
 
     assign multicycle_done = lsu_req_dec ? lsu_resp_valid_i : (illegal_insn_dec ? coproc_done : ex_valid_i);
 
-    always_comb begin
-      if (x_wait_scoreboard_fsm_q == WAIT_SCOREBOARD_EMPTY)
-        coproc_done = 1'b0;
-      else if (scoreboard_q == '0)
-        coproc_done = 1'b1;
-      else
-        coproc_done = (x_issue_valid_o & x_issue_ready_i & ~x_issue_resp_i.writeback) | (x_result_valid_i & x_result_i.we);
-    end
-
+    assign coproc_done = (x_issue_valid_o & x_issue_ready_i & ~x_issue_resp_i.writeback) | (x_result_valid_i & x_result_i.we);
+    
     // Issue Interface
-    assign x_issue_valid_pre_scoreboard = instr_executing & illegal_insn_dec & (id_fsm_q == FIRST_CYCLE);
-    assign x_issue_valid_o      = x_issue_valid_pre_scoreboard & (~scoreboard_full);
+    assign x_issue_valid_o      = instr_executing & illegal_insn_dec & (id_fsm_q == FIRST_CYCLE) & scoreboard_free;
     assign x_issue_req_o.instr  = instr_rdata_i;
     assign x_issue_req_o.id     = x_instr_id_q;
     assign x_issue_req_o.hartid = hart_id_i;
@@ -402,7 +359,6 @@ module cve2_id_stage #(
     assign unused_x_issue_ready = x_issue_ready_i;
     assign x_issue_req_o        = '0;
     assign unused_x_issue_resp  = x_issue_resp_i;
-    assign x_issue_valid_pre_scoreboard = 1'b0;
 
     // Register Interface
     assign x_register_o = '0;
@@ -794,7 +750,6 @@ module cve2_id_stage #(
     branch_set_raw_d        = 1'b0;
     jump_set_raw            = 1'b0;
     perf_branch_o           = 1'b0;
-    wait_x_scoreboard       = 1'b0;
 
     if (instr_executing_spec) begin
       unique case (id_fsm_q)
@@ -851,11 +806,6 @@ module cve2_id_stage #(
                   else begin
                     id_fsm_d = FIRST_CYCLE;
                   end
-                end
-                else if (x_issue_valid_pre_scoreboard && x_issue_ready_i) begin
-                  id_fsm_d = MULTI_CYCLE;
-                  stall_coproc = 1'b1;
-                  wait_x_scoreboard = 1'b1;
                 end
                 else begin
                   stall_coproc = 1'b1;
