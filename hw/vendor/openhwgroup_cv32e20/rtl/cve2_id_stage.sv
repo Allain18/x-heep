@@ -332,9 +332,7 @@ module cve2_id_stage #(
     assign x_register_o.rs_valid = '1;
     assign x_register_o.id       = x_instr_id_q;
     assign x_register_o.hartid   = hart_id_i;
-
-    // Commit Interface
-    assign x_commit_valid_o       = 1'b1;
+    assign x_commit_valid_o       = x_issue_valid_o & x_issue_ready_i;
     assign x_commit_o.commit_kill = 1'b0;
     assign x_commit_o.id          = x_instr_id_q;
     assign x_commit_o.hartid      = hart_id_i;
