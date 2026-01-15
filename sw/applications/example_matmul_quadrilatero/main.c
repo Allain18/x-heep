@@ -211,6 +211,7 @@ void  __attribute__ ((noinline))  matrixMul_4x4(DATA_IN_t* addrA,DATA_IN_t* addr
 
 
 // Output tile size: 8x8
+//TODO: set a timer
 void  __attribute__ ((noinline))  matrixMul_8x8(DATA_IN_t* addrA,DATA_IN_t* addrB,DATA_OUT_t* addrC, int K, int N, int M, int shift)
 {
 
@@ -261,6 +262,7 @@ void  __attribute__ ((noinline))  matrixMul_8x8(DATA_IN_t* addrA,DATA_IN_t* addr
     asm volatile(MACC(HEAD_LINE,4,1,0)                                                 );   // m4 += m1 * m0
     asm volatile("mld.w   m2, (s2) , s3         "                            );   // m2  = A[s2]
     asm volatile("mzero   m5                    "                            );   // m5  = 0
+    asm volatile("wfi                           "                            );
     asm volatile("add     s11,%0,s11            " :: "r" (addrB)             );   // s11 = startAddrB1 = addrB + K*4*(n0+WIDTH)
     asm volatile(MACC(HEAD_LINE,6,1,2)                                                 );   // m6 +=  m1 * m2
     asm volatile("mld.w   m3, (s11), a6         "                            );   // m3  = B[s11]
