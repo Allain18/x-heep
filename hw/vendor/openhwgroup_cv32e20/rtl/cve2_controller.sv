@@ -449,7 +449,7 @@ module cve2_controller #(
           retain_id = 1'b1;
 
           // The FSM will always go directly to FLUSH.
-
+          // when X-IF is active and xif_scoreboard_busy_i, wait the scoreboard to be empty before switching state
           ctrl_fsm_ns = xif_scoreboard_busy_i ? DECODE: FLUSH;
         end
 

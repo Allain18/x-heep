@@ -113,7 +113,9 @@ uint32_t check_results(int K, int N, int M);
 
 #define MACC(HEAD,__mat1__, __mat2__, __mat3__) HEAD "  m" #__mat1__", m"#__mat2__", m"#__mat3__
 // -------------------------------------------------------------------------------------------------------------------------------------
-
+void fic_irq_ext_peripheral(void) {
+    return;
+}
 
 int main()
 {
@@ -135,6 +137,9 @@ int main()
     //start mcycle csr
     CSR_CLEAR_BITS(CSR_REG_MCOUNTINHIBIT, 0x1);
     CSR_WRITE(CSR_REG_MCYCLE, 0);
+
+    CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);
+    CSR_SET_BITS(CSR_REG_MIE, 1<<31);
 
     //execute the kernel
     MATRIX_MUL(addrA,addrB,addrC,K_size,N_size,M_size,SIMD_SHIFT);
@@ -254,6 +259,7 @@ void  __attribute__ ((noinline))  matrixMul_8x8(DATA_IN_t* addrA,DATA_IN_t* addr
     asm volatile("slli    t5,t1, 2              "                            );   // t5  = n0*4;
     asm volatile("mld.w   m0, (s1) , s3         "                            );   // m0  = A[s1] 
     asm volatile("mzero   m4                    "                            );   // m4  = 0;
+    asm volatile("divu    x0, x0, x1            "                            );   //divu
     asm volatile("mul     s9,s3,t1              "                            );   // s9  = K*4*n0;
     asm volatile("add     s9 ,%0,s9             " :: "r" (addrB)             );   // s9  = startAddrB0 = addrB + K*4*n0 
     asm volatile("mld.w   m1, (s9) , a6         "                            );   // m1  = B[s9]
@@ -262,7 +268,6 @@ void  __attribute__ ((noinline))  matrixMul_8x8(DATA_IN_t* addrA,DATA_IN_t* addr
     asm volatile(MACC(HEAD_LINE,4,1,0)                                                 );   // m4 += m1 * m0
     asm volatile("mld.w   m2, (s2) , s3         "                            );   // m2  = A[s2]
     asm volatile("mzero   m5                    "                            );   // m5  = 0
-    asm volatile("wfi                           "                            );
     asm volatile("add     s11,%0,s11            " :: "r" (addrB)             );   // s11 = startAddrB1 = addrB + K*4*(n0+WIDTH)
     asm volatile(MACC(HEAD_LINE,6,1,2)                                                 );   // m6 +=  m1 * m2
     asm volatile("mld.w   m3, (s11), a6         "                            );   // m3  = B[s11]
