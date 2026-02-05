@@ -74,12 +74,12 @@ module testharness #(
   // CORE-V X-IF parameters
   // ----------------------
   // NOTE: CV32E20 does not supports reading from more than 2 registers so far
-  localparam int unsigned TB_X_NUM_RS    = (CpuType == cv32e20) ? cve2_pkg::X_NUM_RS : fpu_ss_pkg::X_NUM_RS;
-  localparam int unsigned TB_X_ID_WIDTH  = (CpuType == cv32e20) ? cve2_pkg::X_ID_WIDTH : fpu_ss_pkg::X_ID_WIDTH;
-  localparam int unsigned TB_X_MEM_WIDTH = (CpuType == cv32e20) ? 32 : fpu_ss_pkg::X_MEM_WIDTH;
-  localparam int unsigned TB_X_RFR_WIDTH = (CpuType == cv32e20) ? cve2_pkg::X_RFR_WIDTH : fpu_ss_pkg::X_RFR_WIDTH;
-  localparam int unsigned TB_X_RFW_WIDTH = (CpuType == cv32e20) ? cve2_pkg::X_RFW_WIDTH : fpu_ss_pkg::X_RFW_WIDTH;
-  localparam logic [31:0] TB_X_MISA      = (QUADRILATERO != 0) ? '0 : {
+  localparam int unsigned TB_X_NUM_RS    = (QUADRILATERO != 0) ? xif_pkg::X_NUM_RS    : fpu_ss_pkg::X_NUM_RS;
+  localparam int unsigned TB_X_ID_WIDTH  = (QUADRILATERO != 0) ? xif_pkg::X_ID_WIDTH  : fpu_ss_pkg::X_ID_WIDTH;
+  localparam int unsigned TB_X_MEM_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_MEM_WIDTH : fpu_ss_pkg::X_MEM_WIDTH;
+  localparam int unsigned TB_X_RFR_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_RFR_WIDTH : fpu_ss_pkg::X_RFR_WIDTH;
+  localparam int unsigned TB_X_RFW_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_RFW_WIDTH : fpu_ss_pkg::X_RFW_WIDTH;
+  localparam logic [31:0] TB_X_MISA      = (QUADRILATERO != 0) ? xif_pkg::X_MISA : {
     {26{1'b0}}, fpu_ss_pkg::C_RVF, 1'b0, fpu_ss_pkg::C_RVD, 3'h0
   };
   localparam logic [1:0] TB_X_ECS_XS = '0;
@@ -689,7 +689,7 @@ module testharness #(
       //          R4-type instruction format, with 3 source operands. One example is 'fmadd.s'. So
       //          make sure not to use CV32E20 if you need a RV32F-compliant system. The FPU is
       //          connected here just for testing purposes.
-      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || (FPU_SS_ZFINX && core_v_mini_mcu_pkg::CpuType == cv32e20)) && 0 && (QUADRILATERO == 0)) begin: gen_fpu_ss_wrapper
+      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || (FPU_SS_ZFINX && core_v_mini_mcu_pkg::CpuType == cv32e20)) && 1 && (QUADRILATERO == 0)) begin: gen_fpu_ss_wrapper
         fpu_ss_wrapper #(
             .PULP_ZFINX(FPU_SS_ZFINX),
             .INPUT_BUFFER_DEPTH(1),
@@ -714,7 +714,7 @@ module testharness #(
 
       // Quadrilatero
       // ------------
-      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || core_v_mini_mcu_pkg::CpuType == cv32e20) && 0 && (QUADRILATERO != 0)) begin: gen_quadrilatero_wrapper
+      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || core_v_mini_mcu_pkg::CpuType == cv32e20) && 1 && (QUADRILATERO != 0)) begin: gen_quadrilatero_wrapper
         quadrilatero_wrapper #(
             .MATRIX_FPU(0)
         ) quadrilatero_wrapper_i (

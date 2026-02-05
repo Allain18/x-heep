@@ -76,12 +76,12 @@ module testharness #(
   // CORE-V X-IF parameters
   // ----------------------
   // NOTE: CV32E20 does not supports reading from more than 2 registers so far
-  localparam int unsigned TB_X_NUM_RS    = (CpuType == cv32e20) ? cve2_pkg::X_NUM_RS : fpu_ss_pkg::X_NUM_RS;
-  localparam int unsigned TB_X_ID_WIDTH  = (CpuType == cv32e20) ? cve2_pkg::X_ID_WIDTH : fpu_ss_pkg::X_ID_WIDTH;
-  localparam int unsigned TB_X_MEM_WIDTH = (CpuType == cv32e20) ? 32 : fpu_ss_pkg::X_MEM_WIDTH;
-  localparam int unsigned TB_X_RFR_WIDTH = (CpuType == cv32e20) ? cve2_pkg::X_RFR_WIDTH : fpu_ss_pkg::X_RFR_WIDTH;
-  localparam int unsigned TB_X_RFW_WIDTH = (CpuType == cv32e20) ? cve2_pkg::X_RFW_WIDTH : fpu_ss_pkg::X_RFW_WIDTH;
-  localparam logic [31:0] TB_X_MISA      = (QUADRILATERO != 0) ? '0 : {
+  localparam int unsigned TB_X_NUM_RS    = (QUADRILATERO != 0) ? xif_pkg::X_NUM_RS    : fpu_ss_pkg::X_NUM_RS;
+  localparam int unsigned TB_X_ID_WIDTH  = (QUADRILATERO != 0) ? xif_pkg::X_ID_WIDTH  : fpu_ss_pkg::X_ID_WIDTH;
+  localparam int unsigned TB_X_MEM_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_MEM_WIDTH : fpu_ss_pkg::X_MEM_WIDTH;
+  localparam int unsigned TB_X_RFR_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_RFR_WIDTH : fpu_ss_pkg::X_RFR_WIDTH;
+  localparam int unsigned TB_X_RFW_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_RFW_WIDTH : fpu_ss_pkg::X_RFW_WIDTH;
+  localparam logic [31:0] TB_X_MISA      = (QUADRILATERO != 0) ? xif_pkg::X_MISA : {
     {26{1'b0}}, fpu_ss_pkg::C_RVF, 1'b0, fpu_ss_pkg::C_RVD, 3'h0
   };
   localparam logic [1:0] TB_X_ECS_XS = '0;
