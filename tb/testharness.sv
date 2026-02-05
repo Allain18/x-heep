@@ -682,6 +682,13 @@ module testharness #(
           .io3(spi_flash_sd_io[3])
       );
 
+      // FPU Subsystem
+      // -------------
+      // WARNING: CV32E20 currently only supports offloading two source operands to the coprocessor.
+      //          On the other hand, some instructions in the RISC-V "F" or "D" instructions use the
+      //          R4-type instruction format, with 3 source operands. One example is 'fmadd.s'. So
+      //          make sure not to use CV32E20 if you need a RV32F-compliant system. The FPU is
+      //          connected here just for testing purposes.
       if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || (FPU_SS_ZFINX && core_v_mini_mcu_pkg::CpuType == cv32e20)) && 0 && (QUADRILATERO == 0)) begin: gen_fpu_ss_wrapper
         fpu_ss_wrapper #(
             .PULP_ZFINX(FPU_SS_ZFINX),
@@ -704,6 +711,9 @@ module testharness #(
             .xif_result_if(ext_if)
         );
       end
+
+      // Quadrilatero
+      // ------------
       if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || core_v_mini_mcu_pkg::CpuType == cv32e20) && 0 && (QUADRILATERO != 0)) begin: gen_quadrilatero_wrapper
         quadrilatero_wrapper #(
             .MATRIX_FPU(0)
