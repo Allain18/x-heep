@@ -107,7 +107,7 @@ module cve2_xif_wrapper
       // The third operand is tied to zero
       assign xif_issue_if.issue_req.rs       = {{X_RFR_WIDTH{1'b0}}, cve2_x_register.rs};
       assign xif_issue_if.issue_req.rs_valid = {1'b0, cve2_x_register.rs_valid};
-    end else begin : gen_xif_rs
+    end else begin : gen_xif_same_rs
       assign xif_issue_if.issue_req.rs[1:0]       = cve2_x_register.rs;
       assign xif_issue_if.issue_req.rs_valid[1:0] = cve2_x_register.rs_valid;
     end

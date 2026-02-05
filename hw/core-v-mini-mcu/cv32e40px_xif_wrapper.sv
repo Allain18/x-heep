@@ -14,7 +14,8 @@ module cv32e40px_xif_wrapper
     parameter FPU_ADDMUL_LAT = 0,  // Floating-Point ADDition/MULtiplication computing lane pipeline registers number
     parameter FPU_OTHERS_LAT = 0,  // Floating-Point COMParison/CONVersion computing lanes pipeline registers number
     parameter ZFINX = 0,  // Float-in-General Purpose registers
-    parameter NUM_MHPMCOUNTERS = 1
+    parameter NUM_MHPMCOUNTERS = 1,
+    parameter core_v_mini_mcu_pkg::xif_cfg_t XIF_CFG = core_v_mini_mcu_pkg::XifCfgDefault
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -125,11 +126,11 @@ module cv32e40px_xif_wrapper
   assign xif_issue_if.issue_req.ecs         = x_issue_req.ecs;
   assign xif_issue_if.issue_req.ecs_valid   = x_issue_req.ecs_valid;
   generate
-    if ($bits(xif_issue_if.issue_req.rs_valid) == 3) begin : gen_xif_same_rs
+    if (XIF_CFG.X_NUM_RS == 3) begin : gen_xif_same_rs
       //cv32e40px has 3 ports so no problem
       assign xif_issue_if.issue_req.rs       = x_issue_req.rs;
       assign xif_issue_if.issue_req.rs_valid = x_issue_req.rs_valid;
-    end else begin : gen_xif_downsized_rs
+    end else begin : gen_xif_downsize_rs
       //if 2 ports (we do not support 1 or >3 ports)
       assign xif_issue_if.issue_req.rs[0]         = x_issue_req.rs[0];
       assign xif_issue_if.issue_req.rs[1]         = x_issue_req.rs[1];

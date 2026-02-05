@@ -144,7 +144,14 @@ cv32e40x_params.append(f".DBG_NUM_TRIGGERS(0)")
 %>
 
     cv32e40x_core #(
-${",\n".join(cv32e40x_params)}
+${",\n".join(cv32e40x_params)},
+        .X_NUM_RS    (XIF_CFG.X_NUM_RS)
+        .X_ID_WIDTH  (XIF_CFG.X_ID_WIDTH)
+        .X_MEM_WIDTH (XIF_CFG.X_MEM_WIDTH)
+        .X_RFR_WIDTH (XIF_CFG.X_RFR_WIDTH)
+        .X_RFW_WIDTH (XIF_CFG.X_RFW_WIDTH)
+        .X_MISA      (XIF_CFG.X_MISA)
+        .X_ECS_XS    (XIF_CFG.X_ECS_XS)
     ) cv32e40x_core_i (
         // Clock and reset
         .clk_i(clk_i),
@@ -263,7 +270,8 @@ if cpu.is_defined("cv_x_if"):
 %>
 
     cv32e40px_xif_wrapper #(
-${",\n".join(cv32e40px_params)}
+${",\n".join(cv32e40px_params)},
+      .XIF_CFG(XIF_CFG)
     ) cv32e40px_top_i (
         .clk_i (clk_i),
         .rst_ni(rst_ni),
