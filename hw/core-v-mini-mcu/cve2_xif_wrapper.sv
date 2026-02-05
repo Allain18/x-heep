@@ -16,7 +16,7 @@ module cve2_xif_wrapper
     parameter int unsigned MHPMCounterWidth = 40,
     parameter bit          RV32E            = 1'b0,
     parameter rv32m_e      RV32M            = RV32MFast,
-    parameter bit          XInterface       = 1'b0
+    parameter bit          X_INTERFACE      = 1'b0
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -138,7 +138,7 @@ module cve2_xif_wrapper
       .MHPMCounterWidth(MHPMCounterWidth),
       .RV32E(RV32E),
       .RV32M(RV32M),
-      .XInterface(XInterface != '0)
+      .XInterface(X_INTERFACE != '0)
   ) u_cve2_top (
       .clk_i,
       .rst_ni,
