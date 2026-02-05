@@ -103,7 +103,7 @@ module cve2_xif_wrapper
   assign cve2_x_issue_resp.accept           = xif_issue_if.issue_resp.accept;
   assign cve2_x_issue_resp.writeback        = xif_issue_if.issue_resp.writeback;
   generate
-    if (XIF_CFG.X_NUM_RS == 3) begin : gen_xif_rs_upsize
+    if (XIF_CFG.X_NUM_RS == 3) begin : gen_xif_upsize_rs
       // The third operand is tied to zero
       assign xif_issue_if.issue_req.rs       = {{X_RFR_WIDTH{1'b0}}, cve2_x_register.rs};
       assign xif_issue_if.issue_req.rs_valid = {1'b0, cve2_x_register.rs_valid};
@@ -143,10 +143,10 @@ module cve2_xif_wrapper
   // CV32E20 CORE
   // ------------
   cve2_top #(
-      .MHPMCounterNum(MHPMCounterNum),
-      .MHPMCounterWidth(MHPMCounterWidth),
-      .RV32E(RV32E),
-      .RV32M(RV32M),
+      .MHPMCounterNum,
+      .MHPMCounterWidth,
+      .RV32E,
+      .RV32M,
       .XInterface(X_INTERFACE != '0)
   ) u_cve2_top (
       .clk_i,
