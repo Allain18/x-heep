@@ -113,15 +113,14 @@ ${",\n".join(cv32e20_params)}
         .debug_halted_o(),
 
         // CORE-V-XIF
-        .xif_compressed_if (xif_compressed_if),
-        .xif_issue_if (xif_issue_if),
-        .xif_commit_if (xif_commit_if),
-        .xif_mem_if (xif_mem_if),
-        .xif_mem_result_if (xif_mem_result_if),
-        .xif_result_if (xif_result_if),
+        .xif_compressed_if,
+        .xif_issue_if,
+        .xif_commit_if,
+        .xif_mem_if,
+        .xif_mem_result_if,
+        .xif_result_if,
 
         .fetch_enable_i(fetch_enable),
-
         .core_sleep_o
     );
 
@@ -261,7 +260,7 @@ if cpu.is_defined("cv_x_if"):
     cv32e40px_params.append(f".COREV_X_IF({cpu.get_sv_str('cv_x_if')})")
 %>
 
-    cv32e40px_top #(
+    cv32e40px_xif_wrapper #(
 ${",\n".join(cv32e40px_params)}
     ) cv32e40px_top_i (
         .clk_i (clk_i),
@@ -292,36 +291,12 @@ ${",\n".join(cv32e40px_params)}
         .data_rvalid_i(core_data_resp_i.rvalid),
 
         // CORE-V-XIF
-        // Compressed interface
-        .x_compressed_valid_o(xif_compressed_if.compressed_valid),
-        .x_compressed_ready_i(xif_compressed_if.compressed_ready),
-        .x_compressed_req_o  (xif_compressed_if.compressed_req),
-        .x_compressed_resp_i (xif_compressed_if.compressed_resp),
-
-        // Issue Interface
-        .x_issue_valid_o(xif_issue_if.issue_valid),
-        .x_issue_ready_i(xif_issue_if.issue_ready),
-        .x_issue_req_o  (xif_issue_if.issue_req),
-        .x_issue_resp_i (xif_issue_if.issue_resp),
-
-        // Commit Interface
-        .x_commit_valid_o(xif_commit_if.commit_valid),
-        .x_commit_o(xif_commit_if.commit),
-
-        // Memory Request/Response Interface
-        .x_mem_valid_i(xif_mem_if.mem_valid),
-        .x_mem_ready_o(xif_mem_if.mem_ready),
-        .x_mem_req_i  (xif_mem_if.mem_req),
-        .x_mem_resp_o (xif_mem_if.mem_resp),
-
-        // Memory Result Interface
-        .x_mem_result_valid_o(xif_mem_result_if.mem_result_valid),
-        .x_mem_result_o(xif_mem_result_if.mem_result),
-
-        // Result Interface
-        .x_result_valid_i(xif_result_if.result_valid),
-        .x_result_ready_o(xif_result_if.result_ready),
-        .x_result_i(xif_result_if.result),
+        .xif_compressed_if,
+        .xif_issue_if,
+        .xif_commit_if,
+        .xif_mem_if,
+        .xif_mem_result_if,
+        .xif_result_if,
 
         .irq_i    (irq_i),
         .irq_ack_o(irq_ack_o),
