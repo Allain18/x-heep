@@ -9,7 +9,8 @@ module cpu_subsystem
   import core_v_mini_mcu_pkg::*;
 #(
     parameter BOOT_ADDR = 'h180,
-    parameter DM_HALTADDRESS = '0
+    parameter DM_HALTADDRESS = '0,
+    parameter xif_cfg_t XIF_CFG = XifCfgDefault
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -59,7 +60,12 @@ module cpu_subsystem
 
 
 
-  cve2_xif_wrapper #() cv32e20_i (
+  cve2_xif_wrapper #(
+      .RV32E(1'b0),
+      .RV32M(cve2_pkg::RV32MSlow),
+      .X_INTERFACE(1),
+      .XIF_CFG(XIF_CFG)
+  ) cv32e20_i (
       .clk_i (clk_i),
       .rst_ni(rst_ni),
 
@@ -94,15 +100,14 @@ module cpu_subsystem
       .debug_halted_o(),
 
       // CORE-V-XIF
-      .xif_compressed_if(xif_compressed_if),
-      .xif_issue_if(xif_issue_if),
-      .xif_commit_if(xif_commit_if),
-      .xif_mem_if(xif_mem_if),
-      .xif_mem_result_if(xif_mem_result_if),
-      .xif_result_if(xif_result_if),
+      .xif_compressed_if,
+      .xif_issue_if,
+      .xif_commit_if,
+      .xif_mem_if,
+      .xif_mem_result_if,
+      .xif_result_if,
 
       .fetch_enable_i(fetch_enable),
-
       .core_sleep_o
   );
 

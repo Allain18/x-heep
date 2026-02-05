@@ -12,11 +12,12 @@
 module cve2_xif_wrapper
   import cve2_pkg::*;
 #(
-    parameter int unsigned MHPMCounterNum   = 0,
-    parameter int unsigned MHPMCounterWidth = 40,
-    parameter bit          RV32E            = 1'b0,
-    parameter rv32m_e      RV32M            = RV32MFast,
-    parameter bit          X_INTERFACE      = 1'b0
+    parameter int unsigned                   MHPMCounterNum   = 0,
+    parameter int unsigned                   MHPMCounterWidth = 40,
+    parameter bit                            RV32E            = 1'b0,
+    parameter rv32m_e                        RV32M            = RV32MFast,
+    parameter bit                            X_INTERFACE      = 1'b0,
+    parameter core_v_mini_mcu_pkg::xif_cfg_t XIF_CFG          = core_v_mini_mcu_pkg::XifCfgDefault
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -97,12 +98,20 @@ module cve2_xif_wrapper
   assign xif_issue_if.issue_req.instr       = cve2_x_issue_req.instr;
   assign xif_issue_if.issue_req.mode        = '0;
   assign xif_issue_if.issue_req.id          = cve2_x_issue_req.id;
-  assign xif_issue_if.issue_req.rs          = cve2_x_register.rs;
-  assign xif_issue_if.issue_req.rs_valid    = cve2_x_register.rs_valid;
   assign xif_issue_if.issue_req.ecs         = '0;
   assign xif_issue_if.issue_req.ecs_valid   = 1'b0;
   assign cve2_x_issue_resp.accept           = xif_issue_if.issue_resp.accept;
   assign cve2_x_issue_resp.writeback        = xif_issue_if.issue_resp.writeback;
+  generate
+    if (XIF_CFG.X_NUM_RS == 3) begin : gen_xif_rs_upsize
+      // The third operand is tied to zero
+      assign xif_issue_if.issue_req.rs       = {{X_RFR_WIDTH{1'b0}}, cve2_x_register.rs};
+      assign xif_issue_if.issue_req.rs_valid = {1'b0, cve2_x_register.rs_valid};
+    end else begin : gen_xif_rs
+      assign xif_issue_if.issue_req.rs[1:0]       = cve2_x_register.rs;
+      assign xif_issue_if.issue_req.rs_valid[1:0] = cve2_x_register.rs_valid;
+    end
+  endgenerate
   // NOTE: the following is suboptimal as it forces CVE2 to read all the registers,
   //       regardless of the coprocessor actually using them. Since CVE2 does not
   //       have other instructions in flight, there is no performance penalty.

@@ -76,15 +76,15 @@ module testharness #(
   // CORE-V X-IF parameters
   // ----------------------
   // NOTE: CV32E20 does not supports reading from more than 2 registers so far
-  localparam int unsigned TB_X_NUM_RS    = (QUADRILATERO != 0) ? xif_pkg::X_NUM_RS    : fpu_ss_pkg::X_NUM_RS;
-  localparam int unsigned TB_X_ID_WIDTH  = (QUADRILATERO != 0) ? xif_pkg::X_ID_WIDTH  : fpu_ss_pkg::X_ID_WIDTH;
-  localparam int unsigned TB_X_MEM_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_MEM_WIDTH : fpu_ss_pkg::X_MEM_WIDTH;
-  localparam int unsigned TB_X_RFR_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_RFR_WIDTH : fpu_ss_pkg::X_RFR_WIDTH;
-  localparam int unsigned TB_X_RFW_WIDTH = (QUADRILATERO != 0) ? xif_pkg::X_RFW_WIDTH : fpu_ss_pkg::X_RFW_WIDTH;
-  localparam logic [31:0] TB_X_MISA      = (QUADRILATERO != 0) ? xif_pkg::X_MISA : {
-    {26{1'b0}}, fpu_ss_pkg::C_RVF, 1'b0, fpu_ss_pkg::C_RVD, 3'h0
+  localparam core_v_mini_mcu_pkg::xif_cfg_t XifCfg = '{
+    X_NUM_RS    : (QUADRILATERO != 0) ? xif_pkg::X_NUM_RS    : fpu_ss_pkg::X_NUM_RS,
+    X_ID_WIDTH  : (QUADRILATERO != 0) ? xif_pkg::X_ID_WIDTH  : fpu_ss_pkg::X_ID_WIDTH,
+    X_MEM_WIDTH : (QUADRILATERO != 0) ? xif_pkg::X_MEM_WIDTH : fpu_ss_pkg::X_MEM_WIDTH,
+    X_RFR_WIDTH : (QUADRILATERO != 0) ? xif_pkg::X_RFR_WIDTH : fpu_ss_pkg::X_RFR_WIDTH,
+    X_RFW_WIDTH : (QUADRILATERO != 0) ? xif_pkg::X_RFW_WIDTH : fpu_ss_pkg::X_RFW_WIDTH,
+    X_MISA      : (QUADRILATERO != 0) ? xif_pkg::X_MISA : {{26{1'b0}}, fpu_ss_pkg::C_RVF, 1'b0, fpu_ss_pkg::C_RVD, 3'h0},
+    X_ECS_XS    : core_v_mini_mcu_pkg::XifCfgDefault.X_ECS_XS
   };
-  localparam logic [1:0] TB_X_ECS_XS = '0;
 
   // Internal signals
   // ----------------
@@ -189,14 +189,13 @@ module testharness #(
   logic [EXT_DOMAINS_RND-1:0] external_ram_banks_set_retentive_n;
   logic [EXT_DOMAINS_RND-1:0] external_subsystem_clkgate_en_n;
 
-  // eXtension Interface
   if_xif #(
-      .X_NUM_RS(TB_X_NUM_RS),
-      .X_ID_WIDTH(TB_X_ID_WIDTH),
-      .X_MEM_WIDTH(TB_X_MEM_WIDTH),
-      .X_RFR_WIDTH(TB_X_RFR_WIDTH),
-      .X_RFW_WIDTH(TB_X_RFW_WIDTH),
-      .X_MISA(TB_X_MISA)
+    .X_NUM_RS(XifCfg.X_NUM_RS),
+    .X_ID_WIDTH(XifCfg.X_ID_WIDTH),
+    .X_MEM_WIDTH(XifCfg.X_MEM_WIDTH),
+    .X_RFR_WIDTH(XifCfg.X_RFR_WIDTH),
+    .X_RFW_WIDTH(XifCfg.X_RFW_WIDTH),
+    .X_MISA(XifCfg.X_MISA)
   ) ext_if ();
 
   // External SPC interface signals
@@ -253,7 +252,8 @@ module testharness #(
   // X-HEEP system instance
   x_heep_system #(
       .EXT_XBAR_NMASTER(HEEP_EXT_XBAR_NMASTER),
-      .AO_SPC_NUM(AO_SPC_NUM)
+      .AO_SPC_NUM(AO_SPC_NUM),
+      .XIF_CFG(XifCfg)
   ) x_heep_system_i (
       .clk_i(clk),
       .rst_ni(rst_n),

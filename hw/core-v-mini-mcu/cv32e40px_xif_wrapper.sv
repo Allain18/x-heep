@@ -124,18 +124,18 @@ module cv32e40px_xif_wrapper
   assign xif_issue_if.issue_req.id          = x_issue_req.id;
   assign xif_issue_if.issue_req.ecs         = x_issue_req.ecs;
   assign xif_issue_if.issue_req.ecs_valid   = x_issue_req.ecs_valid;
- generate
-   if ($bits(xif_issue_if.issue_req.rs_valid) == 3) begin: gen_xif_same_rs
+  generate
+    if ($bits(xif_issue_if.issue_req.rs_valid) == 3) begin : gen_xif_same_rs
       //cv32e40px has 3 ports so no problem
       assign xif_issue_if.issue_req.rs       = x_issue_req.rs;
       assign xif_issue_if.issue_req.rs_valid = x_issue_req.rs_valid;
-   end else begin: gen_xif_downsized_rs
+    end else begin : gen_xif_downsized_rs
       //if 2 ports (we do not support 1 or >3 ports)
       assign xif_issue_if.issue_req.rs[0]         = x_issue_req.rs[0];
       assign xif_issue_if.issue_req.rs[1]         = x_issue_req.rs[1];
       assign xif_issue_if.issue_req.rs_valid[1:0] = x_issue_req.rs_valid[1:0];
-   end
- endgenerate
+    end
+  endgenerate
 
   //input x_issue_resp_t x_issue_resp_i,
   assign x_issue_resp = xif_issue_if.issue_resp;
