@@ -67,7 +67,7 @@ class XHeep:
         :rtype: CPU
         """
         return self._cpu
-    
+
     # ------------------------------------------------------------
     # CORE-V eXtension Interface (CV-X-IF)
     # ------------------------------------------------------------
@@ -242,7 +242,7 @@ class XHeep:
         :rtype: Any
         """
         return self._extensions.get(name, None)
-    
+
     def is_extension_defined(self, name):
         """
         Check if an extension is defined.
@@ -350,7 +350,8 @@ class XHeep:
         if self.xif() is not None and self.cpu().get_name() in ["cv32e40p"]:
             ret = False
             print(
-                f"[MCU-GEN] ERROR: CV-X-IF enabled (xheep.set_xif()) with incompatible CPU ({self.cpu().get_name()}).", file=sys.stderr
+                f"[MCU-GEN] ERROR: CV-X-IF enabled (xheep.set_xif()) with incompatible CPU ({self.cpu().get_name()}).",
+                file=sys.stderr,
             )
 
         return ret

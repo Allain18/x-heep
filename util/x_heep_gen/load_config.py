@@ -456,8 +456,12 @@ def load_cpu_config(
         cpu = CPU(cpu_type_config)
 
     system.set_cpu(cpu)
-    if cpu_features_config.get("cv_x_if", None) is not None and cpu_type_config in ["cv32e20", "cv32e40px", "cv32e40x"]:
-        system.set_xif(CvXIf()) # use default parameters
+    if cpu_features_config.get("cv_x_if", None) is not None and cpu_type_config in [
+        "cv32e20",
+        "cv32e40px",
+        "cv32e40x",
+    ]:
+        system.set_xif(CvXIf())  # use default parameters
 
 
 def load_cfg_hjson(src: str) -> XHeep:

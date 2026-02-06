@@ -3,7 +3,16 @@ class CvXIf:
     Represent the CORE-V eXtension Interface configuration.
     """
 
-    def __init__(self, x_num_rs: int = 2, x_id_width: int = 4, x_mem_width: int = 32, x_rfr_width: int = 32, x_rfw_width: int = 32, x_misa: int = 0x0, x_ecs_xs: int = 0x0):
+    def __init__(
+        self,
+        x_num_rs: int = 2,
+        x_id_width: int = 4,
+        x_mem_width: int = 32,
+        x_rfr_width: int = 32,
+        x_rfw_width: int = 32,
+        x_misa: int = 0x0,
+        x_ecs_xs: int = 0x0,
+    ):
         self.x_num_rs = x_num_rs
         self.x_id_width = x_id_width
         self.x_mem_width = x_mem_width
