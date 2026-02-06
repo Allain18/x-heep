@@ -9,11 +9,10 @@ import UPF::*;
 <%
   cpu = xheep.cpu()
   xif = xheep.xif()
+  th  = xheep.get_extension("testharness")
 %>
 
 module testharness #(
-    parameter bit FPU_SS_ZFINX                = 1,
-    parameter bit QUADRILATERO                = 0,
     parameter bit JTAG_DPI                    = 0,
     parameter bit USE_EXTERNAL_DEVICE_EXAMPLE = 1,
     parameter     CLK_FREQUENCY               = 'd100_000  //KHz
@@ -73,6 +72,10 @@ module testharness #(
 
   localparam EXT_DOMAINS_RND = core_v_mini_mcu_pkg::EXTERNAL_DOMAINS == 0 ? 1 : core_v_mini_mcu_pkg::EXTERNAL_DOMAINS;
   localparam NEXT_INT_RND = core_v_mini_mcu_pkg::NEXT_INT == 0 ? 1 : core_v_mini_mcu_pkg::NEXT_INT;
+
+  // Test system configuration
+  localparam bit FPU_SS_ZFINX = 1'b${th["FPU_SS_ZFINX"]};
+  localparam bit QUADRILATERO = 1'b${th["QUADRILATERO"]};
 
   // Internal signals
   // ----------------

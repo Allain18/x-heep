@@ -41,7 +41,7 @@ def config():
     ))
 
     system.set_xif(CvXIf(
-        x_num_rs    = 2,
+        x_num_rs    = 3, # for FPU testing only (CV32E20 does not actually read 3 GPRs)
         x_id_width  = 4,
         x_mem_width = 32,
         x_rfr_width = 32,
@@ -89,5 +89,16 @@ def config():
     # Add the peripheral domains to the system
     system.add_peripheral_domain(base_peripheral_domain)
     system.add_peripheral_domain(user_peripheral_domain)
+
+    # X-HEEP testharness extension
+    # Here we enable the "ZFINX" RISC-V extension for the FPU
+    testharness_extension = {
+        # Enable "zfinx" RISC-V extensions in the FPU subsystem for CV32E20 as it does not have floating-point registers
+        "FPU_SS_ZFINX": 1 if system.cpu().get_name() == "cv32e20" else 0,
+        
+        # Disable Quadrilatero as here we use the CV-X-IF for the FPU
+        "QUADRILATERO": 0, # Enables Matrix custom RISC-V extensions. Admitted values: 1|0.
+    }
+    system.add_extension("testharness", testharness_extension)
 
     return system

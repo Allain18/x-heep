@@ -63,7 +63,7 @@ module cpu_subsystem
       .RV32E(1'b0),
       .RV32M(cve2_pkg::RV32MFast),
       .X_INTERFACE(1'b1),
-      .X_INTERFACE_NUM_RS(2)
+      .X_INTERFACE_NUM_RS(3)
   ) cv32e20_i (
       .clk_i (clk_i),
       .rst_ni(rst_ni),

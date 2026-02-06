@@ -340,7 +340,7 @@ class XHeep:
         if self.xif() is not None and self.cpu().get_name() in ["cv32e40p"]:
             ret = False
             print(
-                f"ERROR: CV-X-IF enabled (xheep.set_xif()) with incompatible CPU ({self.cpu().get_name()}).", file=sys.stderr
+                f"[MCU-GEN] ERROR: CV-X-IF enabled (xheep.set_xif()) with incompatible CPU ({self.cpu().get_name()}).", file=sys.stderr
             )
 
         return ret
