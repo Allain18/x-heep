@@ -73,9 +73,14 @@ module testharness #(
   localparam EXT_DOMAINS_RND = core_v_mini_mcu_pkg::EXTERNAL_DOMAINS == 0 ? 1 : core_v_mini_mcu_pkg::EXTERNAL_DOMAINS;
   localparam NEXT_INT_RND = core_v_mini_mcu_pkg::NEXT_INT == 0 ? 1 : core_v_mini_mcu_pkg::NEXT_INT;
 
-  // Test system configuration
+  // CV-X-IF coprocessors configuration
+% if xheep.is_extension_defined("testharness"):
   localparam bit FPU_SS_ZFINX = 1'b${th["FPU_SS_ZFINX"]};
   localparam bit QUADRILATERO = 1'b${th["QUADRILATERO"]};
+% else:
+  localparam bit FPU_SS_ZFINX = 1'b0;
+  localparam bit QUADRILATERO = 1'b0;
+% endif
 
   // Internal signals
   // ----------------

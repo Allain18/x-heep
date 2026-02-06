@@ -242,6 +242,16 @@ class XHeep:
         :rtype: Any
         """
         return self._extensions.get(name, None)
+    
+    def is_extension_defined(self, name):
+        """
+        Check if an extension is defined.
+
+        :param str name: Name of the extension.
+        :return: `True` if the extension is defined, `False` otherwise.
+        :rtype: bool
+        """
+        return name in self._extensions
 
     # ------------------------------------------------------------
     # Build and Validate
