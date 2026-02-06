@@ -1,7 +1,9 @@
+import sys
 from copy import deepcopy
 from .bus_type import BusType
 from .memory_ss.memory_ss import MemorySS
 from .cpu.cpu import CPU
+from .cv_x_if import CvXIf
 from .peripherals.abstractions import PeripheralDomain
 from .peripherals.base_peripherals_domain import BasePeripheralDomain
 from .peripherals.user_peripherals_domain import UserPeripheralDomain
@@ -31,6 +33,8 @@ class XHeep:
             )
 
         self._cpu = None
+
+        self._xif: CvXIf = None
 
         self._bus_type: BusType = bus_type
 
@@ -63,6 +67,29 @@ class XHeep:
         :rtype: CPU
         """
         return self._cpu
+    
+    # ------------------------------------------------------------
+    # CORE-V eXtension Interface (CV-X-IF)
+    # ------------------------------------------------------------
+
+    def set_xif(self, xif: CvXIf):
+        """
+        Sets the configuration of the CORE-V eXtension Interface (CV-X-IF).
+
+        :param CvXIf xif: CV-X-IF instance with the desired paramters.
+
+        :raise TypeError: when xif is of incorrect type.
+        """
+        if not isinstance(xif, CvXIf):
+            raise TypeError(f"XHeep.xif should be of type CvXIf not {type(self._cpu)}")
+        self._xif = xif
+
+    def xif(self) -> CvXIf:
+        """
+        :return: the configured CV-X-IF
+        :rtype: CvXIf
+        """
+        return self._xif
 
     # ------------------------------------------------------------
     # Bus
@@ -308,4 +335,12 @@ class XHeep:
                 f"Always on peripheral start address must be greater than 0x10000, current address is {self._base_peripheral_domain.get_start_address():#08X}."
             )
             ret = False
+
+        # Check that the extension interface is enabled with a supported core
+        if self.xif() is not None and self.cpu().get_name() in ["cv32e40p"]:
+            ret = False
+            print(
+                f"ERROR: CV-X-IF enabled (xheep.set_xif()) with incompatible CPU ({self.cpu().get_name()}).", file=sys.stderr
+            )
+
         return ret

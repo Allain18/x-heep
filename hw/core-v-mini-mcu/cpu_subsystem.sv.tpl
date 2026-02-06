@@ -4,6 +4,7 @@
 
 <%
   cpu = xheep.cpu()
+  xif = xheep.xif()
 %>
 
 module cpu_subsystem
@@ -11,8 +12,7 @@ module cpu_subsystem
   import core_v_mini_mcu_pkg::*;
 #(
     parameter BOOT_ADDR = 'h180,
-    parameter DM_HALTADDRESS = '0,
-    parameter xif_cfg_t XIF_CFG = XifCfgDefault
+    parameter DM_HALTADDRESS = '0
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -70,16 +70,16 @@ if cpu.is_defined("rv32e"):
 if cpu.is_defined("rv32m"):
     cv32e20_params.append(f".RV32M(cve2_pkg::{cpu.get_sv_str('rv32m')})")
 
-if cpu.is_defined("cv_x_if"):
-    cv32e20_params.append(f".X_INTERFACE({cpu.get_sv_str('cv_x_if')})")
+if xif != None:
+    cv32e20_params.append(f".X_INTERFACE(1'b1)")
+    cv32e20_params.append(f".X_INTERFACE_NUM_RS({xif.x_num_rs})")
 
 if cpu.is_defined("num_mhpmcounters"):
     cv32e20_params.append(f".MHPMCounterNum({cpu.get_sv_str('num_mhpmcounters')})")
 %>
 
     cve2_xif_wrapper #(
-${",\n".join(cv32e20_params)},
-        .XIF_CFG(XIF_CFG)
+${",\n".join(cv32e20_params)}
     ) cv32e20_i (
         .clk_i (clk_i),
         .rst_ni(rst_ni),
@@ -134,8 +134,15 @@ ${",\n".join(cv32e20_params)},
 <%
 cv32e40x_params = []
 
-if cpu.is_defined("cv_x_if"):
-    cv32e40x_params.append(f".X_EXT({cpu.get_sv_str('cv_x_if')})")
+if xif != None:
+    cv32e40x_params.append(f".X_INTERFACE(1'b1)")
+    cv32e40x_params.append(f".X_NUM_RS({xif.x_num_rs})")
+    cv32e40x_params.append(f".X_ID_WIDTH({xif.x_id_width})")
+    cv32e40x_params.append(f".X_MEM_WIDTH({xif.x_mem_width})")
+    cv32e40x_params.append(f".X_RFR_WIDTH({xif.x_rfr_width})")
+    cv32e40x_params.append(f".X_RFW_WIDTH({xif.x_rfw_width})")
+    cv32e40x_params.append(f".X_MISA({xif.x_misa})")
+    cv32e40x_params.append(f".X_ECS_XS({xif.x_ecs_xs})")
 
 if cpu.is_defined("num_mhpmcounters"):
     cv32e40x_params.append(f".NUM_MHPMCOUNTERS({cpu.get_sv_str('num_mhpmcounters')})")
@@ -144,14 +151,7 @@ cv32e40x_params.append(f".DBG_NUM_TRIGGERS(0)")
 %>
 
     cv32e40x_core #(
-${",\n".join(cv32e40x_params)},
-        .X_NUM_RS    (XIF_CFG.X_NUM_RS)
-        .X_ID_WIDTH  (XIF_CFG.X_ID_WIDTH)
-        .X_MEM_WIDTH (XIF_CFG.X_MEM_WIDTH)
-        .X_RFR_WIDTH (XIF_CFG.X_RFR_WIDTH)
-        .X_RFW_WIDTH (XIF_CFG.X_RFW_WIDTH)
-        .X_MISA      (XIF_CFG.X_MISA)
-        .X_ECS_XS    (XIF_CFG.X_ECS_XS)
+${",\n".join(cv32e40x_params)}
     ) cv32e40x_core_i (
         // Clock and reset
         .clk_i(clk_i),
@@ -265,13 +265,13 @@ if cpu.is_defined("corev_pulp"):
 if cpu.is_defined("num_mhpmcounters"):
     cv32e40px_params.append(f".NUM_MHPMCOUNTERS({cpu.get_sv_str('num_mhpmcounters')})")
 
-if cpu.is_defined("cv_x_if"):
-    cv32e40px_params.append(f".COREV_X_IF({cpu.get_sv_str('cv_x_if')})")
+if xif != None:
+    cv32e40px_params.append(f".X_INTERFACE(1'b1)")
+    cv32e40px_params.append(f".X_INTERFACE_NUM_RS({xif.x_num_rs})")
 %>
 
     cv32e40px_xif_wrapper #(
-${",\n".join(cv32e40px_params)},
-      .XIF_CFG(XIF_CFG)
+${",\n".join(cv32e40px_params)}
     ) cv32e40px_top_i (
         .clk_i (clk_i),
         .rst_ni(rst_ni),

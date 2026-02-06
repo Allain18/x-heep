@@ -50,17 +50,27 @@ The `cv32e20` CPU supports the following optional parameters:
 - `rv32e` (bool): Enable or disable the RV32E extension.
 - `rv32m` (str): Set the RV32M extension configuration. Possible values are defined in the
   `rv32m_e` enumeral in the `hw/vendor/openhwgroup_cv32e20/rtl/cve2_pkg.sv` file.
-- `cv_x_if` (bool): Enable or disable the CORE-V X-Interface.
+
+`cv32e20` supports the CORE-V eXtension Interface (CV-X-IF) in case it is set with `xheep.set_xif()`.
 
 The following example sets the default configuration from the rtl found in `hw/core-v-mini-mcu/cve2_xif_wrapper.sv`:
 
 ```python
 from x_heep_gen.cpu.cv32e20 import cv32e20
+from x_heep_gen.xif import CvXIf
 ...
 xheep.set_cpu(cv32e20(
     rv32e=False,
     rv32m="RV32MFast",
-    cv_x_if=False,
+))
+xheep.set_xif(CvXIf(
+    x_num_rs    = 2,
+    x_id_width  = 4,
+    x_mem_width = 32,
+    x_rfr_width = 32,
+    x_rfw_width = 32,
+    x_misa      = 0x0,
+    x_ecs_xs    = 0x0,
 ))
 ```
 
@@ -104,10 +114,11 @@ The `cv32e40px` CPU supports the following optional parameters:
   Requires `fpu` to be enabled.
 - `corev_pulp` (bool): Enable or disable CORE-V PULP-specific extensions.
 - `num_mhpmcounters` (int): Number of machine hardware performance counters (MHPM counters).
-- `cv_x_if` (bool): Enable or disable the CORE-V X-Interface.
+
+`cv32e40px` supports the CORE-V eXtension Interface (CV-X-IF) in case it is set with `xheep.set_xif()`.
 
 The following example sets the default configuration from the RTL found in
-`hw/vendor/esl_epfl_cv32e40px/rtl/cv32e40px_top.sv`:
+`hw/vendor/esl_epfl_cv32e40px/rtl/cv32e40px_xif_wrapper.sv`:
 
 ```python
 from x_heep_gen.cpu.cv32e40px import cv32e40px
@@ -119,15 +130,15 @@ xheep.set_cpu(cv32e40px(
     zfinx=False,
     corev_pulp=False,
     num_mhpmcounters=1,
-    cv_x_if=False,
 ))
 ```
 
 ### cv32e40x CPU configuration
 
 The `cv32e40x` CPU supports the following optional parameters:
-- `cv_x_if` (bool): Enable or disable the CORE-V X-Interface.
 - `num_mhpmcounters` (int): Number of machine hardware performance counters (MHPM counters).
+
+`cv32e40x` supports the CORE-V eXtension Interface (CV-X-IF) in case it is set with `xheep.set_xif()`.
 
 The following example sets the default configuration from the RTL found in
 `hw/vendor/openhwgroup_cv32e40x/rtl/cv32e40x_core.sv`:
@@ -136,7 +147,6 @@ The following example sets the default configuration from the RTL found in
 from x_heep_gen.cpu.cv32e40x import cv32e40x
 ...
 xheep.set_cpu(cv32e40x(
-    cv_x_if=False,
     num_mhpmcounters=1,
 ))
 ```
@@ -156,7 +166,6 @@ can be provided through the `cpu_features` field. The complete list is the follo
 cpu_features: {
     fpu: false
     zfinx: false
-    cv_x_if: false
     corev_pulp: false
     cve2_rv32e: false
     cve2_rv32m: "RV32MFast"

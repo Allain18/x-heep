@@ -7,7 +7,6 @@
 module cv32e40px_xif_wrapper
   import cv32e40px_core_v_xif_pkg::*;
 #(
-    parameter COREV_X_IF = 0,
     parameter COREV_PULP = 0, // PULP ISA Extension (incl. custom CSRs and hardware loop, excl. cv.elw)
     parameter COREV_CLUSTER = 0,  // PULP Cluster interface (incl. cv.elw)
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
@@ -15,7 +14,8 @@ module cv32e40px_xif_wrapper
     parameter FPU_OTHERS_LAT = 0,  // Floating-Point COMParison/CONVersion computing lanes pipeline registers number
     parameter ZFINX = 0,  // Float-in-General Purpose registers
     parameter NUM_MHPMCOUNTERS = 1,
-    parameter core_v_mini_mcu_pkg::xif_cfg_t XIF_CFG = core_v_mini_mcu_pkg::XifCfgDefault
+    parameter bit X_INTERFACE = 0,
+    parameter int unsigned X_INTERFACE_NUM_RS = 2
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -126,7 +126,7 @@ module cv32e40px_xif_wrapper
   assign xif_issue_if.issue_req.ecs         = x_issue_req.ecs;
   assign xif_issue_if.issue_req.ecs_valid   = x_issue_req.ecs_valid;
   generate
-    if (XIF_CFG.X_NUM_RS == 3) begin : gen_xif_same_rs
+    if (X_NUM_RS == 3) begin : gen_xif_same_rs
       //cv32e40px has 3 ports so no problem
       assign xif_issue_if.issue_req.rs       = x_issue_req.rs;
       assign xif_issue_if.issue_req.rs_valid = x_issue_req.rs_valid;
@@ -172,7 +172,7 @@ module cv32e40px_xif_wrapper
   assign x_result = xif_result_if.result;
 
   cv32e40px_top #(
-      .COREV_X_IF,
+      .COREV_X_IF(X_INTERFACE),
       .COREV_PULP,
       .COREV_CLUSTER,
       .FPU,

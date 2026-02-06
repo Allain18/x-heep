@@ -34,26 +34,6 @@ package core_v_mini_mcu_pkg;
 
   localparam cpu_type_e CpuType = ${xheep.cpu().get_name()};
 
-  typedef struct packed {
-    int unsigned X_NUM_RS;
-    int unsigned X_ID_WIDTH;
-    int unsigned X_MEM_WIDTH;
-    int unsigned X_RFR_WIDTH;
-    int unsigned X_RFW_WIDTH;
-    logic [31:0] X_MISA;
-    logic [1:0]  X_ECS_XS;
-  } xif_cfg_t;
-
-  localparam xif_cfg_t XifCfgDefault = '{
-    X_NUM_RS    : unsigned'(2),
-    X_ID_WIDTH  : unsigned'(32),
-    X_MEM_WIDTH : unsigned'(32),
-    X_RFR_WIDTH : unsigned'(32),
-    X_RFW_WIDTH : unsigned'(32),
-    X_MISA      : '0,
-    X_ECS_XS    : '0
-  };
-
   typedef enum logic {
     NtoM,
     onetoM

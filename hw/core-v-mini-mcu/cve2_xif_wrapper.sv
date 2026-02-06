@@ -12,12 +12,12 @@
 module cve2_xif_wrapper
   import cve2_pkg::*;
 #(
-    parameter int unsigned                   MHPMCounterNum   = 0,
-    parameter int unsigned                   MHPMCounterWidth = 40,
-    parameter bit                            RV32E            = 1'b0,
-    parameter rv32m_e                        RV32M            = RV32MFast,
-    parameter bit                            X_INTERFACE      = 1'b0,
-    parameter core_v_mini_mcu_pkg::xif_cfg_t XIF_CFG          = core_v_mini_mcu_pkg::XifCfgDefault
+    parameter int unsigned MHPMCounterNum     = 0,
+    parameter int unsigned MHPMCounterWidth   = 40,
+    parameter bit          RV32E              = 1'b0,
+    parameter rv32m_e      RV32M              = RV32MFast,
+    parameter bit          X_INTERFACE        = 1'b0,
+    parameter int unsigned X_INTERFACE_NUM_RS = 2
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -103,7 +103,7 @@ module cve2_xif_wrapper
   assign cve2_x_issue_resp.accept           = xif_issue_if.issue_resp.accept;
   assign cve2_x_issue_resp.writeback        = xif_issue_if.issue_resp.writeback;
   generate
-    if (XIF_CFG.X_NUM_RS == 3) begin : gen_xif_upsize_rs
+    if (X_INTERFACE_NUM_RS == 3) begin : gen_xif_upsize_rs
       // The third operand is tied to zero
       assign xif_issue_if.issue_req.rs       = {{X_RFR_WIDTH{1'b0}}, cve2_x_register.rs};
       assign xif_issue_if.issue_req.rs_valid = {1'b0, cve2_x_register.rs_valid};

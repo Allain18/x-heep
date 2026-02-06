@@ -8,6 +8,7 @@ import UPF::*;
 
 <%
   cpu = xheep.cpu()
+  xif = xheep.xif()
 %>
 
 module testharness #(
@@ -72,19 +73,6 @@ module testharness #(
 
   localparam EXT_DOMAINS_RND = core_v_mini_mcu_pkg::EXTERNAL_DOMAINS == 0 ? 1 : core_v_mini_mcu_pkg::EXTERNAL_DOMAINS;
   localparam NEXT_INT_RND = core_v_mini_mcu_pkg::NEXT_INT == 0 ? 1 : core_v_mini_mcu_pkg::NEXT_INT;
-
-  // CORE-V X-IF parameters
-  // ----------------------
-  // NOTE: CV32E20 does not supports reading from more than 2 registers so far
-  localparam core_v_mini_mcu_pkg::xif_cfg_t XifCfg = '{
-    X_NUM_RS    : (QUADRILATERO != 0) ? xif_pkg::X_NUM_RS    : fpu_ss_pkg::X_NUM_RS,
-    X_ID_WIDTH  : (QUADRILATERO != 0) ? xif_pkg::X_ID_WIDTH  : fpu_ss_pkg::X_ID_WIDTH,
-    X_MEM_WIDTH : (QUADRILATERO != 0) ? xif_pkg::X_MEM_WIDTH : fpu_ss_pkg::X_MEM_WIDTH,
-    X_RFR_WIDTH : (QUADRILATERO != 0) ? xif_pkg::X_RFR_WIDTH : fpu_ss_pkg::X_RFR_WIDTH,
-    X_RFW_WIDTH : (QUADRILATERO != 0) ? xif_pkg::X_RFW_WIDTH : fpu_ss_pkg::X_RFW_WIDTH,
-    X_MISA      : (QUADRILATERO != 0) ? xif_pkg::X_MISA : {{26{1'b0}}, fpu_ss_pkg::C_RVF, 1'b0, fpu_ss_pkg::C_RVD, 3'h0},
-    X_ECS_XS    : core_v_mini_mcu_pkg::XifCfgDefault.X_ECS_XS
-  };
 
   // Internal signals
   // ----------------
@@ -189,14 +177,19 @@ module testharness #(
   logic [EXT_DOMAINS_RND-1:0] external_ram_banks_set_retentive_n;
   logic [EXT_DOMAINS_RND-1:0] external_subsystem_clkgate_en_n;
 
+  // CORE-V eXtension Interface (CV-X-IF)
+% if xif != None:
   if_xif #(
-    .X_NUM_RS(XifCfg.X_NUM_RS),
-    .X_ID_WIDTH(XifCfg.X_ID_WIDTH),
-    .X_MEM_WIDTH(XifCfg.X_MEM_WIDTH),
-    .X_RFR_WIDTH(XifCfg.X_RFR_WIDTH),
-    .X_RFW_WIDTH(XifCfg.X_RFW_WIDTH),
-    .X_MISA(XifCfg.X_MISA)
+    .X_NUM_RS    (${xif.x_num_rs if xif != None else "unsigned'(2)"}),
+    .X_ID_WIDTH  (${xif.x_id_width if xif != None else "unsigned'(4)"}),
+    .X_MEM_WIDTH (${xif.x_mem_width if xif != None else "unsigned'(32)"}),
+    .X_RFR_WIDTH (${xif.x_rfr_width if xif != None else "unsigned'(32)"}),
+    .X_RFW_WIDTH (${xif.x_rfw_width if xif != None else "unsigned'(32)"}),
+    .X_MISA      (${xif.x_misa if xif != None else "32'h0"})
   ) ext_if ();
+% else:
+  if_xif ext_if (); // unused
+% endif
 
   // External SPC interface signals
   reg_req_t [AO_SPC_NUM_RND:0] ext_ao_peripheral_req;
@@ -252,8 +245,7 @@ module testharness #(
   // X-HEEP system instance
   x_heep_system #(
       .EXT_XBAR_NMASTER(HEEP_EXT_XBAR_NMASTER),
-      .AO_SPC_NUM(AO_SPC_NUM),
-      .XIF_CFG(XifCfg)
+      .AO_SPC_NUM(AO_SPC_NUM)
   ) x_heep_system_i (
       .clk_i(clk),
       .rst_ni(rst_n),
@@ -691,7 +683,7 @@ module testharness #(
       //          R4-type instruction format, with 3 source operands. One example is 'fmadd.s'. So
       //          make sure not to use CV32E20 if you need a RV32F-compliant system. The FPU is
       //          connected here just for testing purposes.
-      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || (FPU_SS_ZFINX && core_v_mini_mcu_pkg::CpuType == cv32e20)) && ${cpu.get_sv_str("cv_x_if") if cpu.is_defined("cv_x_if") else "0"} && (QUADRILATERO == 0)) begin: gen_fpu_ss_wrapper
+      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || (FPU_SS_ZFINX && core_v_mini_mcu_pkg::CpuType == cv32e20)) && ${"1" if xif != None else "0"} && (QUADRILATERO == 0)) begin: gen_fpu_ss_wrapper
         fpu_ss_wrapper #(
             .PULP_ZFINX(FPU_SS_ZFINX),
             .INPUT_BUFFER_DEPTH(1),
@@ -716,7 +708,7 @@ module testharness #(
 
       // Quadrilatero
       // ------------
-      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || core_v_mini_mcu_pkg::CpuType == cv32e20) && ${cpu.get_sv_str("cv_x_if") if cpu.is_defined("cv_x_if") else "0"} && (QUADRILATERO != 0)) begin: gen_quadrilatero_wrapper
+      if ((core_v_mini_mcu_pkg::CpuType == cv32e40x || core_v_mini_mcu_pkg::CpuType == cv32e40px || core_v_mini_mcu_pkg::CpuType == cv32e20) && ${"1" if xif != None else "0"} && (QUADRILATERO != 0)) begin: gen_quadrilatero_wrapper
         quadrilatero_wrapper #(
             .MATRIX_FPU(0)
         ) quadrilatero_wrapper_i (
