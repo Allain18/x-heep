@@ -126,7 +126,7 @@ module cv32e40px_xif_wrapper
   assign xif_issue_if.issue_req.ecs         = x_issue_req.ecs;
   assign xif_issue_if.issue_req.ecs_valid   = x_issue_req.ecs_valid;
   generate
-    if (X_NUM_RS == 3) begin : gen_xif_same_rs
+    if (X_INTERFACE_NUM_RS == 3) begin : gen_xif_same_rs
       //cv32e40px has 3 ports so no problem
       assign xif_issue_if.issue_req.rs       = x_issue_req.rs;
       assign xif_issue_if.issue_req.rs_valid = x_issue_req.rs_valid;
