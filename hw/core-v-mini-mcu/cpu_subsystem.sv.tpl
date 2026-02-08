@@ -272,7 +272,7 @@ if xif != None:
 
     cv32e40px_xif_wrapper #(
 ${",\n".join(cv32e40px_params)}
-    ) cv32e40px_top_i (
+    ) cv32e40px_xif_wrapper_i (
         .clk_i (clk_i),
         .rst_ni(rst_ni),
 
