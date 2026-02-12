@@ -16,7 +16,6 @@ import pickle
 from jsonref import JsonRef
 from mako.template import Template
 import x_heep_gen.load_config
-from x_heep_gen.load_config import load_peripherals_config
 from x_heep_gen.xheep import BusType
 from x_heep_gen.cpu.cpu import CPU
 import os
@@ -105,9 +104,6 @@ def generate_xheep(args):
         has_spi_slave = 1 if config["debug"]["has_spi_slave"] == "yes" else 0
     except KeyError:
         has_spi_slave = 0
-
-    # config is used as the base config for peripherals (if a domain is not defined in the config, it will be added to xheep using informations in config)
-    load_peripherals_config(xheep, args.config)
 
     if args.bus != None and args.bus != "":
         xheep.set_bus_type(BusType(args.bus))
