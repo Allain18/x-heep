@@ -1,5 +1,5 @@
 from x_heep_gen.xheep import XHeep
-from x_heep_gen.cpu.cv32e40px import cv32e40px
+from x_heep_gen.cpu.cv32e20 import cv32e20
 from x_heep_gen.cv_x_if import CvXIf
 from x_heep_gen.bus_type import BusType
 from x_heep_gen.memory_ss.memory_ss import MemorySS
@@ -36,11 +36,11 @@ from x_heep_gen.peripherals.user_peripherals import (
 
 def config():
     system = XHeep(BusType.NtoM)
-    system.set_cpu(cv32e40px())
+    system.set_cpu(cv32e20(rv32e=False, rv32m="RV32MFast"))
 
     system.set_xif(
         CvXIf(
-            x_num_rs=2,  # cv32e40px supports 3 but quadrilatero has only 2
+            x_num_rs=3,  # for FPU testing only (CV32E20 does not actually read 3 GPRs)
             x_id_width=4,
             x_mem_width=32,
             x_rfr_width=32,
@@ -93,8 +93,10 @@ def config():
     # X-HEEP testharness extension
     # Here we enable the "ZFINX" RISC-V extension for the FPU
     testharness_extension = {
-        "FPU_SS_ZFINX": 0,
-        "QUADRILATERO": 1,  # Enables Matrix custom RISC-V extensions. Admitted values: 1|0.
+        # Enable "zfinx" RISC-V extensions in the FPU subsystem for CV32E20 as it does not have floating-point registers
+        "FPU_SS_ZFINX": 1 if system.cpu().get_name() == "cv32e20" else 0,
+        # Disable Quadrilatero as here we use the CV-X-IF for the FPU
+        "QUADRILATERO": 0,  # Enables Matrix custom RISC-V extensions. Admitted values: 1|0.
     }
     system.add_extension("testharness", testharness_extension)
 
