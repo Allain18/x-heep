@@ -378,7 +378,11 @@ module cve2_id_stage #(
     x_issue_resp_t unused_x_issue_resp;
     logic          unused_x_result_valid;
     x_result_t     unused_x_result;
+    logic          unused_coproc_done;
+    logic [31:0]   unused_rf_rdata_c_fwd;
 
+    assign unused_coproc_done = coproc_done;
+    assign unused_rf_rdata_c_fwd = rf_rdata_c_fwd;
 
     assign multicycle_done = lsu_req_dec ? lsu_resp_valid_i : ex_valid_i;
     assign scoreboard_busy = 1'b0;
