@@ -231,9 +231,7 @@ verilator-run-helloworld: mcu-gen verilator-build
 		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
 
 ## First builds the app and then uses Verilator to simulate the HW model and run the FW
-verilator-run-app: app
-	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --run openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) \
-		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
+verilator-run-app: app verilator-run
 
 ## Launches the RTL simulation with the compiled firmware (`app` target) using
 ## the C++ Verilator model previously built (`verilator-build` target).
