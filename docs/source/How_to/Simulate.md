@@ -102,7 +102,7 @@ To simulate your application with Questasim, first set the env variable `MODEL_T
 make questasim-build
 ```
 
-Then, you can run the compilled application with:
+Then, you can run the compiled application with:
 
 ```bash
 make questasim-run
