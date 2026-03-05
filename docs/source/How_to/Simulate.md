@@ -135,7 +135,7 @@ make questasim-build-opt
 Then, you can run the compiled application with:
 
 ```bash
-make questasim-build-opt-run
+make questasim-run-opt
 ```
 
 Alternatively, go to
