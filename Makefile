@@ -231,7 +231,9 @@ verilator-run-helloworld: mcu-gen verilator-build
 		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
 
 ## First builds the app and then uses Verilator to simulate the HW model and run the FW
-verilator-run-app: app verilator-run
+verilator-run-app: app
+	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --run openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) \
+		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
 
 ## Launches the RTL simulation with the compiled firmware (`app` target) using
 ## the C++ Verilator model previously built (`verilator-build` target).
@@ -255,7 +257,8 @@ questasim-run:
 	$(MAKE) -C $(QUESTASIM_DIR) run PLUSARGS="c firmware=../../../sw/build/main.hex"
 
 ## First builds the app and then uses Questasim to simulate the HW model and run the FW
-questasim-run-app: app questasim-run
+questasim-run-app: app
+	$(MAKE) -C $(QUESTASIM_DIR) run PLUSARGS="c firmware=../../../sw/build/main.hex"
 
 ## Launches the RTL simulation with the compiled firmware (`app` target) using
 ## the Questasim model with HDL optimized compilation previously built (`questasim-build-opt` target).
@@ -263,7 +266,8 @@ questasim-run-opt:
 	$(MAKE) -C $(QUESTASIM_DIR) run RUN_OPT=1 PLUSARGS="c firmware=../../../sw/build/main.hex"
 
 ## First builds the app and then uses Questasim to simulate the HW optimized model and run the FW
-questasim-run-opt-app: app questasim-run-opt
+questasim-run-opt-app: app
+	$(MAKE) -C $(QUESTASIM_DIR) run RUN_OPT=1 PLUSARGS="c firmware=../../../sw/build/main.hex"
 
 ## @section Vivado
 
