@@ -81,7 +81,7 @@ __attribute__ ((noinline)) void w25q128jw_controller_run(char use_interrupt, int
     w25q128jw_controller_enable_interrupt(use_interrupt);
 
     //read
-    w25q128jw_controller_read((void*) &sram_buffer_read_flash_back[0], (void*) &flash_ptr[0], (size_t) LENGTH_BYTES);
+    w25q128jw_controller_read((void*) &sram_buffer_read_flash_back[0], (void*) &flash_ptr[0], (size_t) LENGTH_BYTES, 0);
 
     if(use_interrupt) {
         // Wait for interrupt
