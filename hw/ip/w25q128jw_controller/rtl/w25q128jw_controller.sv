@@ -57,6 +57,7 @@ module w25q128jw_controller
 
   // FLASH COMMANDS
   localparam logic [12:0] FC_RD = 13'h03,  // Read Data
+  FC_RDQIO = 13'heb,  // Read Data Quad I/O
   FC_RSR1 = 13'h05,  // Read Status Register 1
   FC_WE = 13'h06,  // Write Enable
   FC_SE = 13'h20,  // Sector Erase 4KB
@@ -96,16 +97,29 @@ module w25q128jw_controller
 
   // -------- READ FSM STATES --------
   // Handles flash read operations via SPI & DMA
-  typedef enum logic [3:0] {
-    READ_IDLE,  // Lead to DMA initialization (necessary before every use of DMA)
-    READ_SET_DMA,  // Set the DMA registers
-    READ_SPI_CHECK_TX_FIFO,  // Check if TX FIFO has space
-    READ_SPI_FILL_TX_FIFO,  // Write command + address to TX FIFO
-    READ_SPI_WAIT_READY_1,  // Wait for SPI Host ready
-    READ_SPI_SEND_CMD_1,  // Send command to specify action type and action location
-    READ_SPI_WAIT_READY_2,  // Wait for SPI Host ready again
-    READ_SPI_SEND_CMD_2,  // Send command to specify read action
-    READ_TRANS  // Wait for DMA transfer complete
+  typedef enum logic [4:0] {
+    READ_IDLE,                       // Lead to DMA initialization (necessary before every use of DMA)
+    READ_SET_DMA,                    // Set the DMA registers
+    READ_SPI_CHECK_TX_FIFO,          // Check if TX FIFO has space
+    READ_SPI_FILL_TX_FIFO,           // Write command + address to TX FIFO (standard mode)
+    READ_SPI_WAIT_READY_1,           // Wait for SPI Host ready
+    READ_SPI_SEND_CMD_1,             // Send command (1st phase, standard mode)
+    READ_SPI_WAIT_READY_2,           // Wait for SPI Host ready again
+    READ_SPI_SEND_CMD_2,             // Send command (2nd phase, standard mode)
+
+    READ_SPI_SEND_CMD_1_QUAD,        // Send command QUAD SPI mode (1st phase, command only)
+    READ_SPI_QUAD_WAIT_READY_1,      // Wait for SPI Host
+    READ_SPI_SEND_CMD_2_QUAD,        // Write standard speed
+    READ_SPI_QUAD_WAIT_READY_2,      // Wait for SPI Host
+    READ_SPI_SEND_CMD_3_QUAD,        // Send address command (quad mode)
+    READ_SPI_QUAD_WAIT_READY_3,      // Wait for SPI Host
+    READ_SPI_SEND_CMD_4_QUAD,        // Send address/mode command (quad mode)
+    READ_SPI_QUAD_WAIT_READY_4,      // Wait for SPI Hos
+    READ_SPI_SEND_CMD_DUMMY_QUAD,    // Send dummy cycles command (quad mode)
+    READ_SPI_QUAD_WAIT_READY_DUMMY,  // Wait for SPI Host
+    READ_SPI_SEND_CMD_5_QUAD,        // Send RX command(quad mode)
+    READ_SPI_QUAD_WAIT_READY_5,      // Wait for SPI Host
+    READ_TRANS                       // Wait for DMA transfer complete
   } read_state_e;
 
   // -------- FLASH WAIT FSM STATES --------
@@ -402,7 +416,7 @@ module w25q128jw_controller
             // See hw/vendor/lowrisc_opentitan_spi_host/data/spi_host.hjson for status register bit mapping
             // See hw/vendor/lowrisc_opentitan_spi_host/rtl/spi_host_reg_pkg.sv for TXQD depth definition
             if (external_spi_host_hw2reg_status_i.txqd.d < SPI_FLASH_TX_FIFO_DEPTH[7:0]) begin
-              read_state_d = READ_SPI_FILL_TX_FIFO;
+              read_state_d = reg2hw.control.quad.q ? READ_SPI_SEND_CMD_1_QUAD : READ_SPI_FILL_TX_FIFO;
             end
           end
 
@@ -489,6 +503,122 @@ module w25q128jw_controller
               };  // Empty + Direction + Speed + Csaat + Length
             end
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
+              read_state_d = READ_TRANS;
+            end
+          end
+
+          READ_SPI_SEND_CMD_1_QUAD: begin
+            spi_host_reg_req_offset  = SPI_HOST_TXDATA_OFFSET;
+            spi_host_reg_req_o.write = 1'b1;
+            spi_host_reg_req_o.valid = 1'b1;
+            spi_host_reg_req_o.wdata = {19'h0, FC_RDQIO};
+            if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
+              read_state_d = READ_SPI_QUAD_WAIT_READY_1;
+            end
+          end
+
+          READ_SPI_QUAD_WAIT_READY_1: begin
+            if (external_spi_host_hw2reg_status_i.ready.d) begin
+              read_state_d = READ_SPI_SEND_CMD_2_QUAD;
+            end
+          end
+
+          READ_SPI_SEND_CMD_2_QUAD: begin
+            // For quad read, we need to send the command in a different format to specify quad mode and command-only (no address) for the first command
+            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_o.write = 1'b1;
+            spi_host_reg_req_o.valid = 1'b1;
+            spi_host_reg_req_o.wdata = {
+              3'h0, 2'h2, 2'h0, 1'h1, 24'h0
+            };  // Reserved + Direction + Speed + Csaat + Length (0 for command only, next command will specify length and quad mode)
+            if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
+              read_state_d = READ_SPI_QUAD_WAIT_READY_2;
+            end
+          end
+
+          READ_SPI_QUAD_WAIT_READY_2: begin
+            if (external_spi_host_hw2reg_status_i.ready.d) begin
+              read_state_d = READ_SPI_SEND_CMD_3_QUAD;
+            end
+          end
+
+          READ_SPI_SEND_CMD_3_QUAD: begin
+            // For quad read, we need to send the command in a different format to specify quad mode and length for the second command
+            spi_host_reg_req_offset = SPI_HOST_TXDATA_OFFSET;
+            spi_host_reg_req_o.write = 1'b1;
+            spi_host_reg_req_o.valid = 1'b1;
+
+            flash_address = reg2hw.f_address.q & 32'h00ffffff;
+            spi_host_reg_req_o.wdata = bitfield_byteswap32(flash_address) |
+                32'hff000000;  // Address with all 4 bytes to be sent (quad mode)
+            if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
+              read_state_d = READ_SPI_QUAD_WAIT_READY_3;
+            end
+          end
+
+          READ_SPI_QUAD_WAIT_READY_3: begin
+            if (external_spi_host_hw2reg_status_i.ready.d) begin
+              read_state_d = READ_SPI_SEND_CMD_4_QUAD;
+            end
+          end
+
+          READ_SPI_SEND_CMD_4_QUAD: begin
+            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_o.write = 1'b1;
+            spi_host_reg_req_o.valid = 1'b1;
+            spi_host_reg_req_o.wdata = {
+              3'h0, 2'h2, 2'h2, 1'h1, 24'h3
+            };  // Reserved + Direction + Speed + Csaat + Length
+            if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
+              read_state_d = READ_SPI_QUAD_WAIT_READY_4;
+            end
+          end
+
+          READ_SPI_QUAD_WAIT_READY_4: begin
+            if (external_spi_host_hw2reg_status_i.ready.d) begin
+              read_state_d = READ_SPI_SEND_CMD_DUMMY_QUAD;
+            end
+          end
+
+          READ_SPI_SEND_CMD_DUMMY_QUAD: begin
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_o.write = 1'b1;
+            spi_host_reg_req_o.valid = 1'b1;
+
+`ifndef FPGA_SYNTHESIS
+            spi_host_reg_req_o.wdata = {
+              3'h0, 2'h0, 2'h2, 1'h1, 24'h7
+            };  // Reserved + Direction + Speed + Csaat + Length
+`else
+            spi_host_reg_req_o.wdata = {
+              3'h0, 2'h0, 2'h2, 1'h1, 24'h3
+            };  // Reserved + Direction + Speed + Csaat + Length
+`endif
+            if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
+              read_state_d = READ_SPI_QUAD_WAIT_READY_DUMMY;
+            end
+          end
+
+          READ_SPI_QUAD_WAIT_READY_DUMMY: begin
+            if (external_spi_host_hw2reg_status_i.ready.d) begin
+              read_state_d = READ_SPI_SEND_CMD_5_QUAD;
+            end
+          end
+
+          READ_SPI_SEND_CMD_5_QUAD: begin
+            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_o.write = 1'b1;
+            spi_host_reg_req_o.valid = 1'b1;
+            spi_host_reg_req_o.wdata = {
+              3'h0, 2'h1, 2'h2, 1'h0, reg2hw.length.q[23:0] - 1'h1
+            };  // Reserved + Direction + Speed + Csaat + Length
+            if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
+              read_state_d = READ_SPI_QUAD_WAIT_READY_5;
+            end
+          end
+
+          READ_SPI_QUAD_WAIT_READY_5: begin
+            if (external_spi_host_hw2reg_status_i.ready.d) begin
               read_state_d = READ_TRANS;
             end
           end
