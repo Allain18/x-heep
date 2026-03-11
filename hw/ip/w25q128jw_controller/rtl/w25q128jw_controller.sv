@@ -98,14 +98,14 @@ module w25q128jw_controller
   // -------- READ FSM STATES --------
   // Handles flash read operations via SPI & DMA
   typedef enum logic [4:0] {
-    READ_IDLE,                       // Lead to DMA initialization (necessary before every use of DMA)
-    READ_SET_DMA,                    // Set the DMA registers
-    READ_SPI_CHECK_TX_FIFO,          // Check if TX FIFO has space
-    READ_SPI_FILL_TX_FIFO,           // Write command + address to TX FIFO (standard mode)
-    READ_SPI_WAIT_READY_1,           // Wait for SPI Host ready
-    READ_SPI_SEND_CMD_1,             // Send command (1st phase, standard mode)
-    READ_SPI_WAIT_READY_2,           // Wait for SPI Host ready again
-    READ_SPI_SEND_CMD_2,             // Send command (2nd phase, standard mode)
+    READ_IDLE,               // Lead to DMA initialization (necessary before every use of DMA)
+    READ_SET_DMA,            // Set the DMA registers
+    READ_SPI_CHECK_TX_FIFO,  // Check if TX FIFO has space
+    READ_SPI_FILL_TX_FIFO,   // Write command + address to TX FIFO (standard mode)
+    READ_SPI_WAIT_READY_1,   // Wait for SPI Host ready
+    READ_SPI_SEND_CMD_1,     // Send command (1st phase, standard mode)
+    READ_SPI_WAIT_READY_2,   // Wait for SPI Host ready again
+    READ_SPI_SEND_CMD_2,     // Send command (2nd phase, standard mode)
 
     READ_SPI_SEND_CMD_1_QUAD,        // Send command QUAD SPI mode (1st phase, command only)
     READ_SPI_QUAD_WAIT_READY_1,      // Wait for SPI Host
@@ -114,11 +114,10 @@ module w25q128jw_controller
     READ_SPI_SEND_CMD_3_QUAD,        // Send address command (quad mode)
     READ_SPI_QUAD_WAIT_READY_3,      // Wait for SPI Host
     READ_SPI_SEND_CMD_4_QUAD,        // Send address/mode command (quad mode)
-    READ_SPI_QUAD_WAIT_READY_4,      // Wait for SPI Hos
+    READ_SPI_QUAD_WAIT_READY_4,      // Wait for SPI Host
     READ_SPI_SEND_CMD_DUMMY_QUAD,    // Send dummy cycles command (quad mode)
     READ_SPI_QUAD_WAIT_READY_DUMMY,  // Wait for SPI Host
     READ_SPI_SEND_CMD_5_QUAD,        // Send RX command(quad mode)
-    READ_SPI_QUAD_WAIT_READY_5,      // Wait for SPI Host
     READ_TRANS                       // Wait for DMA transfer complete
   } read_state_e;
 
@@ -613,12 +612,6 @@ module w25q128jw_controller
               3'h0, 2'h1, 2'h2, 1'h0, reg2hw.length.q[23:0] - 1'h1
             };  // Reserved + Direction + Speed + Csaat + Length
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
-              read_state_d = READ_SPI_QUAD_WAIT_READY_5;
-            end
-          end
-
-          READ_SPI_QUAD_WAIT_READY_5: begin
-            if (external_spi_host_hw2reg_status_i.ready.d) begin
               read_state_d = READ_TRANS;
             end
           end
