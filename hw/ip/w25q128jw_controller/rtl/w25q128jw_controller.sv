@@ -547,8 +547,8 @@ module w25q128jw_controller
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
 
-            flash_address = reg2hw.f_address.q & 32'h00ffffff;
-            spi_host_reg_req_o.wdata = bitfield_byteswap32(flash_address) |
+            flash_address = reg2hw.f_address.q;
+            spi_host_reg_req_o.wdata = (bitfield_byteswap32(flash_address) >> 8) |
                 32'hff000000;  // Address with all 4 bytes to be sent (quad mode)
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               read_state_d = READ_SPI_QUAD_WAIT_READY_3;
