@@ -16,6 +16,9 @@
 #include "w25q128jw.h" //Soft
 #include "w25q128jw_controller.h" //HW
 
+#include "csr.h" // For CSR macros
+#include "rv_plic.h" // For PLIC functions
+
 /* By default, PRINTFs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
 #define PRINTF_IN_SIM   1
@@ -46,9 +49,23 @@ uint32_t flash_data[256];
 // Test functions
 uint32_t test_read_quad_dma(uint32_t *test_buffer, uint32_t len);
 uint32_t test_ctrl_read_quad_dma(uint32_t *test_buffer, uint32_t len);
+uint32_t test_ctrl_read_quad_dma_interrupt(uint32_t *test_buffer, uint32_t len);
+uint32_t test_ctrl_read_standard_dma_interrupt(uint32_t *test_buffer, uint32_t len);
 
 // Check function
 uint32_t check_result(uint8_t *test_buffer, uint32_t len);
+
+
+//
+// ISR
+//
+void handler_irq_w25q128jw_controller(uint32_t id) {
+    // Set the done flag
+    w25q128jw_controller_set_done_flag();
+
+    // Clear the interrupt status register (interrupt handled)
+    w25q128jw_controller_clear_status_register();
+}
 
 // Define global status variable
 w25q_error_codes_t global_status;
@@ -93,6 +110,24 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    // Test quad read with DMA using the controller and interrupts
+    PRINTF("Testing quad read with DMA using the controller and interrupts...\n");
+    errors += test_ctrl_read_quad_dma_interrupt(TEST_BUFFER, LENGTH);
+
+    if (errors) {
+        PRINTF("test_ctrl_read_quad_dma_interrupt FAILED\n");
+        return EXIT_FAILURE;
+    }
+
+        // Test quad read with DMA using the controller and interrupts
+    PRINTF("Testing standard read with DMA using the controller and interrupts...\n");
+    errors += test_ctrl_read_standard_dma_interrupt(TEST_BUFFER, LENGTH);
+
+    if (errors) {
+        PRINTF("test_ctrl_read_standard_dma_interrupt FAILED\n");
+        return EXIT_FAILURE;
+    }
+
     PRINTF("\n--------TEST FINISHED--------\n");
     if (errors == 0) {
         PRINTF("All tests passed!\n");
@@ -126,10 +161,84 @@ uint32_t test_ctrl_read_quad_dma(uint32_t *test_buffer, uint32_t len) {
     uint32_t *test_buffer_flash = test_buffer;
 
     // Read from flash memory at the same address
-    // w25q_error_codes_t status = w25q128jw_read_quad_dma((uint32_t)test_buffer_flash, flash_data, len);
+    w25q128jw_controller_enable_interrupt(0);
     w25q128jw_controller_read(flash_data, test_buffer_flash, len, 1);
 
     while(!w25q128jw_controller_is_ready_polling());
+    w25q128jw_controller_clear_done_flag();
+
+
+    // Check if what we read is correct (i.e. flash_data == test_buffer)
+    uint32_t res = check_result((uint8_t *)test_buffer, len);
+
+    // Reset the flash data buffer
+    memset(flash_data, 0, len * sizeof(uint8_t));
+
+    return res;
+}
+
+uint32_t test_ctrl_read_quad_dma_interrupt(uint32_t *test_buffer, uint32_t len) {
+
+    uint32_t *test_buffer_flash = test_buffer;
+
+    // Clear HW regs before starting operation
+    w25q128jw_controller_clear_status_register();
+
+    // Clear HW regs before starting operation
+    w25q128jw_controller_clear_status_register();
+
+    // Activate interrupt in PLIC
+    plic_Init();
+    plic_irq_set_priority(W25Q128JW_CONTROLLER_INTR_EVENT, 1);
+    plic_irq_set_enabled(W25Q128JW_CONTROLLER_INTR_EVENT, kPlicToggleEnabled);
+    // Activate global CPU interrupts
+    CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);   // Global interrupt enable for machine mode (MIE) bit in Machine Status Registers
+    CSR_SET_BITS(CSR_REG_MIE, (1 << 11)); // Machine External Interrupt Enable (MEIE) bit in Machine Interrupt Pending Register
+    
+    // Read from flash memory at the same address
+    w25q128jw_controller_enable_interrupt(1);
+    w25q128jw_controller_read(flash_data, test_buffer_flash, len, 1);
+
+    while(!w25q128jw_controller_is_ready_intr()) {
+            asm volatile("wfi");  // Wait For Interrupt - CPU sleeps
+        }
+    w25q128jw_controller_clear_done_flag();
+
+
+    // Check if what we read is correct (i.e. flash_data == test_buffer)
+    uint32_t res = check_result((uint8_t *)test_buffer, len);
+
+    // Reset the flash data buffer
+    memset(flash_data, 0, len * sizeof(uint8_t));
+
+    return res;
+}
+
+uint32_t test_ctrl_read_standard_dma_interrupt(uint32_t *test_buffer, uint32_t len) {
+
+    uint32_t *test_buffer_flash = test_buffer;
+
+    // Clear HW regs before starting operation
+    w25q128jw_controller_clear_status_register();
+
+    // Clear HW regs before starting operation
+    w25q128jw_controller_clear_status_register();
+
+    // Activate interrupt in PLIC
+    plic_Init();
+    plic_irq_set_priority(W25Q128JW_CONTROLLER_INTR_EVENT, 1);
+    plic_irq_set_enabled(W25Q128JW_CONTROLLER_INTR_EVENT, kPlicToggleEnabled);
+    // Activate global CPU interrupts
+    CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);   // Global interrupt enable for machine mode (MIE) bit in Machine Status Registers
+    CSR_SET_BITS(CSR_REG_MIE, (1 << 11)); // Machine External Interrupt Enable (MEIE) bit in Machine Interrupt Pending Register
+    
+    // Read from flash memory at the same address
+    w25q128jw_controller_enable_interrupt(1);
+    w25q128jw_controller_read(flash_data, test_buffer_flash, len, 0);
+
+    while(!w25q128jw_controller_is_ready_intr()) {
+            asm volatile("wfi");  // Wait For Interrupt - CPU sleeps
+        }
     w25q128jw_controller_clear_done_flag();
 
 
