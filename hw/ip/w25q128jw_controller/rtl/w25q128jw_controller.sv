@@ -54,6 +54,11 @@ module w25q128jw_controller
 
   // ============== LOCAL PARAMETERS ==============
   localparam int SPI_FLASH_TX_FIFO_DEPTH = spi_host_reg_pkg::TxDepth;
+  localparam logic [1:0] SPI_DIR_DUMMY = 2'h0;
+  localparam logic [1:0] SPI_DIR_RX = 2'h1;
+  localparam logic [1:0] SPI_DIR_TX = 2'h2;
+  localparam logic [1:0] SPI_SPEED_STD = 2'h0;
+  localparam logic [1:0] SPI_SPEED_QUAD = 2'h2;
 
   // FLASH COMMANDS
   localparam logic [12:0] FC_RD = 13'h03,  // Read Data
@@ -77,6 +82,17 @@ module w25q128jw_controller
       adress_to_swap[31:24]  // Byte 3 -> Byte 0
     };
   endfunction
+
+  // verilog_format: off
+  function automatic logic [31:0] spi_cmd_pack(
+      input logic [1:0]  direction,
+      input logic [1:0]  speed,
+      input logic        csaat,
+      input logic [23:0] len_m1
+  );
+    spi_cmd_pack = {3'b000, direction, speed, csaat, len_m1};
+  endfunction
+  // verilog_format: on
 
 
   // ============================================================================
@@ -453,18 +469,15 @@ module w25q128jw_controller
 
           // -------- Send command phase: Read operation from f_address --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (2 = TX only)
-          //   [26:25] = Speed (0 = standard)
-          //   [24]    = CSAAT (1 = keep CS asserted for next command)
-          //   [23:0]  = Length-1 (3 = 4 bytes: 1 command + 3 address)
+          //   Direction TX only
+          //   Speed standard
+          //   CSAAT 1
+          //   Length-1 (3 = 4 bytes: 1 command + 3 address)
           READ_SPI_SEND_CMD_1: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h1, 24'h3
-            };  // Reserved + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b1, 24'h3);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               read_state_d = READ_SPI_WAIT_READY_2;
             end
@@ -480,11 +493,10 @@ module w25q128jw_controller
 
           // -------- Send command phase: Direction and length of read operation --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (1 = RX only)
-          //   [26:25] = Speed (0 = standard)
-          //   [24]    = CSAAT (0 = release CS after transfer, no more commands to send)
-          //   [23:0]  = See comments below
+          //   Direction RX only,
+          //   Speed standard,
+          //   CSAAT 0,
+          //   Length-1 
           READ_SPI_SEND_CMD_2: begin
             spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
@@ -492,14 +504,12 @@ module w25q128jw_controller
 
             if (reg2hw.control.rnw.q) begin
               // READ: receive user-specified number of bytes
-              spi_host_reg_req_o.wdata = {
-                3'h0, 2'h1, 2'h0, 1'h0, reg2hw.length.q[23:0] - 1'h1
-              };  // Empty + Direction + Speed + Csaat + Length
+              spi_host_reg_req_o.wdata =
+                  spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, reg2hw.length.q[23:0] - 1'h1);
             end else begin
               // WRITE: read full sector (4096 bytes)
-              spi_host_reg_req_o.wdata = {
-                3'h0, 2'h1, 2'h0, 1'h0, {11'b0, SE_BSIZE - 1'h1}
-              };  // Empty + Direction + Speed + Csaat + Length
+              spi_host_reg_req_o.wdata =
+                  spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, {11'b0, SE_BSIZE - 1'h1});
             end
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               read_state_d = READ_TRANS;
@@ -524,12 +534,10 @@ module w25q128jw_controller
 
           READ_SPI_SEND_CMD_2_QUAD: begin
             // For quad read, we need to send the command in a different format to specify quad mode and command-only (no address) for the first command
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h1, 24'h0
-            };  // Reserved + Direction + Speed + Csaat + Length (0 for command only, next command will specify length and quad mode)
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b1, 24'h0);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               read_state_d = READ_SPI_QUAD_WAIT_READY_2;
             end
@@ -562,12 +570,10 @@ module w25q128jw_controller
           end
 
           READ_SPI_SEND_CMD_4_QUAD: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h2, 1'h1, 24'h3
-            };  // Reserved + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_QUAD, 1'b1, 24'h3);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               read_state_d = READ_SPI_QUAD_WAIT_READY_4;
             end
@@ -585,13 +591,9 @@ module w25q128jw_controller
             spi_host_reg_req_o.valid = 1'b1;
 
 `ifndef FPGA_SYNTHESIS
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h0, 2'h2, 1'h1, 24'h7
-            };  // Reserved + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_DUMMY, SPI_SPEED_QUAD, 1'b1, 24'h7);
 `else
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h0, 2'h2, 1'h1, 24'h3
-            };  // Reserved + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_DUMMY, SPI_SPEED_QUAD, 1'b1, 24'h3);
 `endif
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               read_state_d = READ_SPI_QUAD_WAIT_READY_DUMMY;
@@ -608,9 +610,8 @@ module w25q128jw_controller
             spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h1, 2'h2, 1'h0, reg2hw.length.q[23:0] - 1'h1
-            };  // Reserved + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata =
+                spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_QUAD, 1'b0, reg2hw.length.q[23:0] - 1'h1);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               read_state_d = READ_TRANS;
             end
@@ -763,17 +764,14 @@ module w25q128jw_controller
 
           // -------- Send command phase: TX 1 byte (the RSR1 command) --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (2 = TX only)
-          //   [24]    = CSAAT (1 = keep CS asserted for next command)
-          //   [23:0]  = Length-1 (0 = 1 byte) (FC_RSR1 is 1 byte command)
+          //   Direction TX only
+          //   CSAAT 1
+          //   Length-1 (0 = 1 byte) (FC_RSR1 is 1 byte command)
           FWAIT_SPI_SEND_CMD_1: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h1, 24'h0
-            };  // Empty + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b1, 24'h0);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               fwait_state_d = FWAIT_SPI_WAIT_READY_2;
             end
@@ -789,17 +787,15 @@ module w25q128jw_controller
 
           // -------- Send command phase: RX 1 byte (the status register value) --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (1 = RX only)
-          //   [24]    = CSAAT (0 = release CS after transfer, no more commands to send)
-          //   [23:0]  = Length-1 (0 = 1 byte)
+          //   Direction RX only
+          //   Speed standard
+          //   CSAAT 0
+          //   Length-1 (0 = 1 byte)
           FWAIT_SPI_SEND_CMD_2: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h1, 2'h0, 1'h0, 24'h0
-            };  // Empty + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, 24'h0);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               fwait_state_d = FWAIT_WAIT_RXWM;
             end
@@ -926,17 +922,15 @@ module w25q128jw_controller
 
           // -------- Send Write Enable command --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (2 = TX only)
-          //   [24]    = CSAAT (0 = release CS after, WE is standalone command)
-          //   [23:0]  = Length-1 (0 = 1 byte)
+          //   Direction TX only
+          //   Speed standard
+          //   CSAAT 0
+          //   Length-1 (0 = 1 byte)
           ERASE_WE_SEND_CMD: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h0, 24'h0
-            };  // Empty + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b0, 24'h0);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               erase_state_d = ERASE_SE_CHECK_TX_FIFO;
             end
@@ -978,17 +972,15 @@ module w25q128jw_controller
 
           // -------- Send Sector Erase command --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (2 = TX only)
-          //   [24]    = CSAAT (0 = release CS after transfer, no more commands to send)
-          //   [23:0]  = Length-1 (3 = 4 bytes: 1 cmd + 3 addr bytes)
+          //   Direction TX only
+          //   Speed standard
+          //   CSAAT 0
+          //   Length-1 (3 = 4 bytes: 1 cmd + 3 addr bytes)
           ERASE_SE_SEND_CMD: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h0, 24'h3
-            };  // Empty + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b0, 24'h3);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               // Go to FWAIT FSM to poll status register until erase completes
               erase_state_d = ERASE_IDLE;
@@ -1169,17 +1161,15 @@ module w25q128jw_controller
 
           // -------- Send Write Enable command --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (2 = TX only)
-          //   [24]    = CSAAT (0 = release CS after, WE is standalone command)
-          //   [23:0]  = Length-1 (0 = 1 byte)
+          //   Direction TX only
+          //   Speed standard
+          //   CSAAT 0
+          //   Length-1 (0 = 1 byte)
           WRITE_WE_SEND_CMD: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h0, 24'h0
-            };  // Empty + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b0, 24'h0);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               write_state_d = WRITE_PP_CHECK_TX_FIFO;
             end
@@ -1220,17 +1210,15 @@ module w25q128jw_controller
 
           // -------- Send Page Program command (Send action type and location) --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (2 = TX only)
-          //   [24]    = CSAAT (1 = keep CS asserted for next command)
-          //   [23:0]  = Length-1 (3 = 4 bytes: 1 cmd + 3 addr)
+          //   Direction TX only
+          //   Speed standard
+          //   CSAAT 1
+          //   Length-1 (3 = 4 bytes: 1 cmd + 3 addr)
           WRITE_PP_SEND_CMD: begin
-            spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
+            spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h1, 24'h3
-            };  // Empty + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata = spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b1, 24'h3);
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               write_state_d = WRITE_DMA_CHECK_READY;
             end
@@ -1296,17 +1284,16 @@ module w25q128jw_controller
 
           // -------- Send command phase: Direction and length of write operation --------
           // COMMAND register format:
-          //   [31:29] = Reserved
-          //   [28:27] = Direction (2 = TX only)
-          //   [24]    = CSAAT (0 = release CS after transfer, no more commands to send)
-          //   [23:0]  = Length-1 (255 = 256 bytes = 1 page)
+          //   Direction TX only
+          //   Speed standard
+          //   CSAAT 0
+          //   Length-1 (255 = 256 bytes = 1 page)
           WRITE_PP_SEND_CMD_2: begin
             spi_host_reg_req_offset = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-            spi_host_reg_req_o.wdata = {
-              3'h0, 2'h2, 2'h0, 1'h0, {11'b0, PAGE_BSIZE - 1'h1}
-            };  // Empty + Direction + Speed + Csaat + Length
+            spi_host_reg_req_o.wdata =
+                spi_cmd_pack(SPI_DIR_TX, SPI_SPEED_STD, 1'b0, {11'b0, PAGE_BSIZE - 1'h1});
 
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               // ===== CHECK IF MORE PAGES/SECTORS TO PROCESS =====
