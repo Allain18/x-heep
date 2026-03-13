@@ -113,6 +113,7 @@ int main(void) {
     int32_t* flash_ptr_test2 = heep_get_flash_address_offset(flash_buffer_test2);
 
 
+    PRINTF("Test w25q128jw Controller read\n");
     /**************************************************************** */
     PRINTF("Test 1: Software Read, standard speed, DMA, no interrupt\n");
     // First, check that the Flash has been programmed/initialized correctly
