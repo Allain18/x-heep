@@ -95,14 +95,6 @@ module w25q128jw_controller
   endfunction
   // verilog_format: on
 
-  task automatic spi_host_set_req(input logic [spi_host_reg_pkg::BlockAw-1:0] req_offset,
-                                  input logic write_req);
-    spi_host_reg_req_offset  = req_offset;
-    spi_host_reg_req_o.write = write_req;
-    spi_host_reg_req_o.valid = 1'b1;
-  endtask
-
-
   // ============================================================================
   // W25Q128JW CONTROLLER FSM
   // ============================================================================
@@ -307,6 +299,15 @@ module w25q128jw_controller
 
   logic [spi_host_reg_pkg::BlockAw-1:0] spi_host_reg_req_offset;
 
+  task automatic spi_host_set_req(input logic [spi_host_reg_pkg::BlockAw-1:0] req_offset,
+                                  input logic write_req);
+    /* verilator lint_off MULTIDRIVEN */
+    spi_host_reg_req_offset  = req_offset;
+    /* verilator lint_on MULTIDRIVEN */
+    spi_host_reg_req_o.write = write_req;
+    spi_host_reg_req_o.valid = 1'b1;
+  endtask
+
   assign spi_host_reg_req_o.addr = SPI_FLASH_START_ADDRESS + {{(32 - spi_host_reg_pkg::BlockAw){1'b0}}, spi_host_reg_req_offset};
 
   // FSM combinational logic
@@ -340,11 +341,13 @@ module w25q128jw_controller
     dma_size = '0;
     flash_address = '0;
 
+    /* verilator lint_off MULTIDRIVEN */
     spi_host_reg_req_o.valid = '0;
     spi_host_reg_req_o.wstrb = 4'b1111;
     spi_host_reg_req_o.write = 1'b0;
     spi_host_reg_req_o.wdata = '0;
     spi_host_reg_req_offset  = '0;
+    /* verilator lint_on MULTIDRIVEN */
 
     // ============================================================================
     // TOP FSM
