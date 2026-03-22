@@ -4,13 +4,12 @@
  *
  * This application demonstrates reading data from the W25Q128JW flash memory
  *
- * Test parameters:
- * - Transfer size: 4100 bytes (spanning over 2 sectors)
  */
 
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "memory.h"
 
 #include "core_v_mini_mcu.h"
@@ -18,15 +17,18 @@
 #include "w25q128jw.h"
 
 #include "w25q128jw_controller.h"
-#include "sram_data.h"
-#include "csr.h" // For CSR macros
-#include "rv_plic.h" // For PLIC functions
+#include "data.h"
 #include "w25q128jw.h"
 #include "dma.h"
 
+/* Read operation flags */
+#define FLAG_SW    (1)       /* Software read (default HW) */
+#define FLAG_INT   (1 << 1)  /* Interrupt-driven read (default no interrupts) */
+#define FLAG_QUAD  (1 << 2)  /* Quad SPI mode (default single mode) */
+
 /* By default, printfs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
-#define PRINTF_IN_SIM   0
+#define PRINTF_IN_SIM   1
 
 #if TARGET_SIM && PRINTF_IN_SIM
     #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
@@ -35,21 +37,6 @@
 #else
     #define PRINTF(...)
 #endif
-
-#define MAGIC_TEST_NUM 0xda41de
-
-int32_t sram_buffer_read_flash_back[NUM_WORDS];
-
-int32_t dma_mem_copy[NUM_WORDS];
-
-/**
- * @brief Compares read data against expected data.
- *
- * @param test_buffer   Pointer to the expected data buffer (what one should read back).
- * @param len           Number of bytes to compare (byte precise).
- * @return              0 if data matches, 1 otherwise.
- */
-uint32_t check_result(uint8_t *test_buffer, uint32_t len);
 
 //
 // ISR
@@ -62,43 +49,75 @@ void handler_irq_w25q128jw_controller(uint32_t id) {
     w25q128jw_controller_clear_status_register();
 }
 
-/**
- * @brief Runs one flash read transaction with the HW controller.
- *
- * This function:
- * 1. Configures controller interrupt mode.
- * 2. Launches the HW read (standard or quad).
- * 3. Waits for completion (interrupt or polling).
- * 4. Clears the software done flag for the next run.
- *
- */
-__attribute__ ((noinline)) void w25q128jw_controller_run(char use_interrupt, char use_quad, int32_t* flash_ptr) {
+static int do_read(
+    const void *src, void *dst, uint32_t len, uint32_t flags
+) {
+    w25q_error_codes_t status = FLASH_OK;
 
-    spi_host_t* spi;
-    spi = spi_flash;
-
-    w25q128jw_controller_enable_interrupt(use_interrupt);
-
-    //read
-    w25q128jw_controller_read((void*) &sram_buffer_read_flash_back[0], (void*) &flash_ptr[0], (size_t) LENGTH_BYTES, use_quad);
-
-    if(use_interrupt) {
-        // Wait for interrupt
-        while(!w25q128jw_controller_is_ready_intr()) {
-            asm volatile("wfi");  // Wait For Interrupt - CPU sleeps
-        }
+    if (flags & FLAG_SW) {
+        // Software read (standard speed, no interrupts, with DMA)
+        status = w25q128jw_read_standard_dma((uint32_t)(uintptr_t)src, (void *)dst, len, 0, 0);
+        return (status == FLASH_OK) ? 0 : 1;
     } else {
-        while(!w25q128jw_controller_is_ready_polling());
+        // Hardware read (using the controller)
+        uint32_t interrupts = (flags & FLAG_INT)  ? 1U : 0U;
+        uint32_t quad       = (flags & FLAG_QUAD) ? 1U : 0U;
+
+        w25q128jw_controller_read((void *)dst, (void *)src, len, interrupts, quad);
+        return 0;
+    }
+}
+
+static int compare_buffers(const void *expected, const void *actual, uint32_t len) {
+    const uint8_t *expected_bytes = (const uint8_t *)(void *)expected;
+    const uint8_t *actual_bytes   = (const uint8_t *)(void *)actual;
+
+    for (uint32_t i = 0; i < len; ++i) {
+        if (expected_bytes[i] != actual_bytes[i]) {
+            PRINTF("Mismatch at %d: expected 0x%x, got 0x%x\n", i, expected_bytes[i], actual_bytes[i]);
+            return 1;
+        }
     }
 
-    //reset flag
-    w25q128jw_controller_clear_done_flag();
+    return 0;
+}
 
+static int run_case(
+    const char *name,
+    const void *src_base,
+    const void *expected_base,
+    void *read_base,
+    uint32_t offset,
+    uint32_t len,
+    uint32_t flags
+) {
+    void *src      = (void *)((char *)src_base      + offset);
+    void *expected = (void *)((char *)expected_base + offset);
+
+    memset((void *)read_base, 0, len);
+
+    if (do_read(src, read_base, len, flags) != 0) {
+        PRINTF("%s: read operation failed\n", name);
+        exit(EXIT_FAILURE);
+    }
+
+    if (compare_buffers(expected, read_base, len) != 0) {
+        PRINTF("%s: FAIL\n", name);
+        exit(EXIT_FAILURE);
+    }
+
+    PRINTF("%s: PASS\n", name);
+    return 0;
 }
 
 int main(void) {
+    uint32_t errors = 0;
+    const uint32_t two_sectors_bytes = 2U * SECTOR_SIZE_BYTES;
 
-    uint32_t res;
+    // Random unaligned offset and length for testing reads
+    const uint32_t unaligned_single_sector_offset_bytes = 43U;
+    const uint32_t unaligned_cross_sector_offset_bytes = SECTOR_SIZE_BYTES - 37U;
+    const uint32_t unaligned_length_bytes = 113U;
 
     // Initialize the DMA
     dma_init(NULL);
@@ -109,255 +128,116 @@ int main(void) {
     // Init SPI host and SPI<->Flash bridge parameters and Flash Power Up
     if (w25q128jw_init(spi) != FLASH_OK) return EXIT_FAILURE;
 
-    int32_t* flash_ptr_test1 = heep_get_flash_address_offset(flash_buffer_test1);
-    int32_t* flash_ptr_test2 = heep_get_flash_address_offset(flash_buffer_test2);
+    int32_t* flash_ptr_source_pattern = heep_get_flash_address_offset(flash_source_pattern);
+    const void *expected_base = (const void *)sram_source_pattern;
 
+    PRINTF("Starting flash read tests\n");
 
-    PRINTF("Test w25q128jw Controller read\n");
-    /**************************************************************** */
-    PRINTF("Test 1: Software Read, standard speed, DMA, no interrupt\n");
-    // First, check that the Flash has been programmed/initialized correctly
-    // we read in SW as we assume the SW is the golden model
-    w25q128jw_read_standard_dma((uint32_t)flash_ptr_test1, sram_buffer_read_flash_back, LENGTH_BYTES, 0, 0);
-    for(int i=0;i<NUM_WORDS;i++) {
-        //in the .h, flash_buffer_test1 contains numbers from 0 to NUM_WORDS in order
-        if(sram_buffer_read_flash_back[i]!=i) {
-            PRINTF("At %d: expected %x, got %x\n", i, i, sram_buffer_read_flash_back[i]);
-            return 1;
-        }
+    // SW read: assumed to be correct to initialize the expected buffer
+    do_read(flash_ptr_source_pattern, (void *)expected_base, two_sectors_bytes, FLAG_SW);
+
+    // Hardware Read, standard speed, DMA, no interrupt
+    errors += run_case(
+        "1) Hardware Read, standard speed, DMA, single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, SECTOR_SIZE_BYTES, 0U
+    );
+    errors += run_case(
+        "2) Hardware Read, standard speed, DMA, two sectors",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, two_sectors_bytes, 0U
+    );
+    errors += run_case(
+        "3) Hardware Read, standard speed, DMA, unaligned single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_single_sector_offset_bytes, unaligned_length_bytes, 0U
+    );
+    errors += run_case(
+        "4) Hardware Read, standard speed, DMA, unaligned cross sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, 0U
+    );
+
+    // Hardware Read, standard speed, DMA, interrupt
+    errors += run_case(
+        "5) Hardware Read, standard speed, DMA, interrupt, single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, SECTOR_SIZE_BYTES, FLAG_INT
+    );
+    errors += run_case(
+        "6) Hardware Read, standard speed, DMA, interrupt, two sectors",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, two_sectors_bytes, FLAG_INT
+    );
+    errors += run_case(
+        "7) Hardware Read, standard speed, DMA, interrupt, unaligned single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
+    );
+    errors += run_case(
+        "8) Hardware Read, standard speed, DMA, interrupt, unaligned cross sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
+    );
+
+    // Hardware Read, quad speed, DMA, no interrupt
+    errors += run_case(
+        "9) Hardware Read, quad speed, DMA, single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, SECTOR_SIZE_BYTES, FLAG_QUAD
+    );
+    errors += run_case(
+        "10) Hardware Read, quad speed, DMA, two sectors",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, two_sectors_bytes, FLAG_QUAD
+    );
+    errors += run_case(
+        "11) Hardware Read, quad speed, DMA, unaligned single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD
+    );
+    errors += run_case(
+        "12) Hardware Read, quad speed, DMA, unaligned cross sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD
+    );
+
+    // Hardware Read, quad speed, DMA, interrupt
+    errors += run_case(
+        "13) Hardware Read, quad speed, DMA, interrupt, single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, SECTOR_SIZE_BYTES, FLAG_QUAD | FLAG_INT
+    );
+    errors += run_case(
+        "14) Hardware Read, quad speed, DMA, interrupt, two sectors",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, two_sectors_bytes, FLAG_QUAD | FLAG_INT
+    );
+    errors += run_case(
+        "15) Hardware Read, quad speed, DMA, interrupt, unaligned single sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
+    );
+    errors += run_case(
+        "15) Hardware Read, quad speed, DMA, interrupt, unaligned cross sector",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
+    );
+
+    // Final check: test that dma is still working
+    errors += run_case(
+        "16) Manual dma copy",
+        flash_ptr_source_pattern, expected_base, sram_buffer,
+        0U, two_sectors_bytes, FLAG_SW
+    );
+
+end:
+    PRINTF("\n--------TEST FINISHED--------\n");
+    if (errors == 0) {
+        PRINTF("All tests passed!\n");
+        return EXIT_SUCCESS;
+    } else {
+        PRINTF("Some tests failed (%d).\n", errors);
+        return EXIT_FAILURE;
     }
-
-
-    /**************************************************************** */
-    PRINTF("Test 2: Hardware Read, standard speed, DMA, no interrupt\n");
-    // Reset the flash data buffer
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-
-    // Read from flash memory at specific address (i.e. flash_buffer_test1) in HW
-    // we use polling
-    w25q128jw_controller_run(0, 0, flash_ptr_test1);
-
-    // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        //in the .h, flash_buffer_test1 contains numbers from 0 to NUM_WORDS in order
-        if(sram_buffer_read_flash_back[i]!=i) {
-            PRINTF("At %d: expected %x, got %x\n", i, i, sram_buffer_read_flash_back[i]);
-            return 2;
-        }
-    }
-
-
-    /**************************************************************** */
-    PRINTF("Test 3: Software Read, standard speed, DMA, no interrupt\n");
-    // Reset the flash data buffer
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-
-    // First, check that the Flash has been programmed/initialized correctly
-    // we read in SW as we assume the SW is the golden model
-    w25q128jw_read_standard_dma((uint32_t)flash_ptr_test2, sram_buffer_read_flash_back, LENGTH_BYTES, 0, 0);
-
-    // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        if(sram_buffer_read_flash_back[i]!=(i+0x800)) {
-            PRINTF("At %d: expected %x, got %x\n", i, (i+0x800), sram_buffer_read_flash_back[i]);
-            return 3;
-        }
-    }
-
-
-    /**************************************************************** */
-    PRINTF("Test 4: Hardware Read, standard speed, DMA, interrupt\n");
-    // Reset the flash data buffer
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-
-    // Read the flash memory at specific address (i.e. flash_buffer_test2) in HW
-    // we use interrupt now
-    // Clear HW regs before starting operation
-    w25q128jw_controller_clear_status_register();
-    // Clear SW flag of ISR before starting operation
-    w25q128jw_controller_clear_done_flag();
-    // Activate interrupt in PLIC
-    plic_Init();
-    plic_irq_set_priority(W25Q128JW_CONTROLLER_INTR_EVENT, 1);
-    plic_irq_set_enabled(W25Q128JW_CONTROLLER_INTR_EVENT, kPlicToggleEnabled);
-    // Activate global CPU interrupts
-    CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);   // Global interrupt enable for machine mode (MIE) bit in Machine Status Registers
-    CSR_SET_BITS(CSR_REG_MIE, (1 << 11)); // Machine External Interrupt Enable (MEIE) bit in Machine Interrupt Pending Register
-
-    w25q128jw_controller_run(1, 0, flash_ptr_test2);
-
-     // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        if(sram_buffer_read_flash_back[i]!=(i+0x800)) {
-            PRINTF("At %d: expected %x, got %x\n", i, (i+0x800), sram_buffer_read_flash_back[i]);
-            return 4;
-        }
-    }
-
-
-    /**************************************************************** */
-    PRINTF("Test 5: Hardware Read, standard speed, DMA with delay, interrupt\n");
-     // Reset the flash data buffer
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-
-    // Read the flash memory at specific address (i.e. flash_buffer_test1) in HW, but we use wait counters
-    // we use interrupt now
-    // Clear HW regs before starting operation
-    w25q128jw_controller_clear_status_register();
-    // Clear SW flag of ISR before starting operation
-    w25q128jw_controller_clear_done_flag();
-    // Activate interrupt in PLIC
-    plic_Init();
-    plic_irq_set_priority(W25Q128JW_CONTROLLER_INTR_EVENT, 1);
-    plic_irq_set_enabled(W25Q128JW_CONTROLLER_INTR_EVENT, kPlicToggleEnabled);
-    // Activate global CPU interrupts
-    CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);   // Global interrupt enable for machine mode (MIE) bit in Machine Status Registers
-    CSR_SET_BITS(CSR_REG_MIE, (1 << 11)); // Machine External Interrupt Enable (MEIE) bit in Machine Interrupt Pending Register
-
-    //we also use the dma slot delay counter (we wait 12 cycles after rvalid in both reads and writes)
-    w25q128jw_set_dma_slot_wait_counter(12);
-
-    w25q128jw_controller_run(1, 0, flash_ptr_test1);
-
-    //reset counter for next tests
-    w25q128jw_set_dma_slot_wait_counter(0); 
-
-     // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        if(sram_buffer_read_flash_back[i]!=i) {
-            PRINTF("At %d: expected %x, got %x\n", i, (i+0x800), sram_buffer_read_flash_back[i]);
-            return 5;
-        }
-    }
-
-        /**************************************************************** */
-    PRINTF("Test 6: Hardware Read, quad speed, DMA, no interrupt\n");
-    // Reset the flash data buffer
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-
-    // Read from flash memory at specific address (i.e. flash_buffer_test1) in HW
-    // we use polling
-    w25q128jw_controller_run(0, 1, flash_ptr_test1);
-
-    // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        //in the .h, flash_buffer_test1 contains numbers from 0 to NUM_WORDS in order
-        if(sram_buffer_read_flash_back[i]!=i) {
-            PRINTF("At %d: expected %x, got %x\n", i, i, sram_buffer_read_flash_back[i]);
-            return 6;
-        }
-    }
-
-
-    /**************************************************************** */
-    PRINTF("Test 7: Hardware Read, quad speed, DMA, interrupt\n");
-    // Reset the flash data buffer
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-
-    // Read the flash memory at specific address (i.e. flash_buffer_test2) in HW
-    // we use interrupt now
-    // Clear HW regs before starting operation
-    w25q128jw_controller_clear_status_register();
-    // Clear SW flag of ISR before starting operation
-    w25q128jw_controller_clear_done_flag();
-    // Activate interrupt in PLIC
-    plic_Init();
-    plic_irq_set_priority(W25Q128JW_CONTROLLER_INTR_EVENT, 1);
-    plic_irq_set_enabled(W25Q128JW_CONTROLLER_INTR_EVENT, kPlicToggleEnabled);
-    // Activate global CPU interrupts
-    CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);   // Global interrupt enable for machine mode (MIE) bit in Machine Status Registers
-    CSR_SET_BITS(CSR_REG_MIE, (1 << 11)); // Machine External Interrupt Enable (MEIE) bit in Machine Interrupt Pending Register
-
-    w25q128jw_controller_run(1, 1, flash_ptr_test2);
-
-     // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        if(sram_buffer_read_flash_back[i]!=(i+0x800)) {
-            PRINTF("At %d: expected %x, got %x\n", i, (i+0x800), sram_buffer_read_flash_back[i]);
-            return 7;
-        }
-    }
-
-
-    /**************************************************************** */
-    PRINTF("Test 8: Hardware Read, quad speed, DMA with delay, interrupt\n");
-     // Reset the flash data buffer
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-
-    // Read the flash memory at specific address (i.e. flash_buffer_test1) in HW, but we use wait counters
-    // we use interrupt now
-    // Clear HW regs before starting operation
-    w25q128jw_controller_clear_status_register();
-    // Clear SW flag of ISR before starting operation
-    w25q128jw_controller_clear_done_flag();
-    // Activate interrupt in PLIC
-    plic_Init();
-    plic_irq_set_priority(W25Q128JW_CONTROLLER_INTR_EVENT, 1);
-    plic_irq_set_enabled(W25Q128JW_CONTROLLER_INTR_EVENT, kPlicToggleEnabled);
-    // Activate global CPU interrupts
-    CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);   // Global interrupt enable for machine mode (MIE) bit in Machine Status Registers
-    CSR_SET_BITS(CSR_REG_MIE, (1 << 11)); // Machine External Interrupt Enable (MEIE) bit in Machine Interrupt Pending Register
-
-    //we also use the dma slot delay counter (we wait 12 cycles after rvalid in both reads and writes)
-    w25q128jw_set_dma_slot_wait_counter(12);
-
-    w25q128jw_controller_run(1, 1, flash_ptr_test1);
-
-    //reset counter for next tests
-    w25q128jw_set_dma_slot_wait_counter(0); 
-
-     // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        if(sram_buffer_read_flash_back[i]!=i) {
-            PRINTF("At %d: expected %x, got %x\n", i, (i+0x800), sram_buffer_read_flash_back[i]);
-            return 8;
-        }
-    }
-
-
-    /**************************************************************** */
-    PRINTF("Test 9: Manual dma copy\n");
-    //As the controller uses the DMA, check you can use it as before soon after
-    dma_init(NULL);
-    dma_trans_t dma_trans = {0};
-    dma_target_t tgt_src  = {0};
-    dma_target_t tgt_dst  = {0};
-
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-    for(int i=0;i<NUM_WORDS;i++) dma_mem_copy[i] = i*i;
-
-    // Initialize the DMA for the next tests
-    tgt_src.ptr = (uint8_t *)dma_mem_copy;
-    tgt_src.inc_d1_du = 1;
-    tgt_src.trig = DMA_TRIG_MEMORY;
-    tgt_src.type = DMA_DATA_TYPE_WORD;
-
-    tgt_dst.ptr = (uint8_t *)sram_buffer_read_flash_back;
-    tgt_dst.inc_d1_du = 1;
-    tgt_dst.trig = DMA_TRIG_MEMORY;
-    tgt_dst.type = DMA_DATA_TYPE_WORD;
-
-    dma_trans.src = &tgt_src;
-    dma_trans.dst = &tgt_dst;
-    dma_trans.src_addr = NULL;
-    dma_trans.size_d1_du = NUM_WORDS;
-    dma_trans.src_type = DMA_DATA_TYPE_WORD;
-    dma_trans.dst_type = DMA_DATA_TYPE_WORD;
-    dma_trans.mode = DMA_TRANS_MODE_SINGLE;
-    dma_trans.win_du = 0;
-    dma_trans.sign_ext = 0;
-    dma_trans.end = DMA_TRANS_END_POLLING;
-    dma_load_transaction(&dma_trans);                                                       \
-    dma_launch(&dma_trans);
-
-     // Check Results
-    for(int i=0;i<NUM_WORDS;i++) {
-        if(sram_buffer_read_flash_back[i]!=dma_mem_copy[i]) {
-            PRINTF("At %d: expected %x, got %x\n", i, dma_mem_copy[i], sram_buffer_read_flash_back[i]);
-            return 9;
-        }
-    }
-
-    PRINTF("All tests passed!\n");
-    return EXIT_SUCCESS;
 }
