@@ -25,6 +25,8 @@
 #define FLAG_INT   (1 << 1)  /* Interrupt-driven read (default no interrupts) */
 #define FLAG_QUAD  (1 << 2)  /* Quad SPI mode (default single mode) */
 
+#define STOP_ON_FAILURE 1    /* Stop on first failure (1) or run all tests (0) */
+
 /* By default, printfs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
 #define PRINTF_IN_SIM   1
@@ -95,17 +97,29 @@ static int run_case(
 
     memset((void *)read_base, 0, len);
 
+    PRINTF("%s: ", name);
+
     if (do_read(src, read_base, len, flags) != 0) {
-        PRINTF("%s: read operation failed\n", name);
-        exit(EXIT_FAILURE);
+        PRINTF("read operation failed\n");
+
+        #if STOP_ON_FAILURE
+            exit(EXIT_FAILURE);
+        #else
+            return 1;
+        #endif
     }
 
     if (compare_buffers(expected, read_base, len) != 0) {
-        PRINTF("%s: FAIL\n", name);
-        exit(EXIT_FAILURE);
+        PRINTF("FAIL\n");
+        
+        #if STOP_ON_FAILURE
+            exit(EXIT_FAILURE);
+        #else
+            return 1;
+        #endif
     }
 
-    PRINTF("%s: PASS\n", name);
+    PRINTF("PASS\n");
     return 0;
 }
 
@@ -218,19 +232,18 @@ int main(void) {
         unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
     );
     errors += run_case(
-        "15) Hardware Read, quad speed, DMA, interrupt, unaligned cross sector",
+        "16) Hardware Read, quad speed, DMA, interrupt, unaligned cross sector",
         flash_ptr_source_pattern, expected_base, sram_buffer,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
     );
 
     // Final check: test that dma is still working
     errors += run_case(
-        "16) Manual dma copy",
+        "17) Manual dma copy",
         flash_ptr_source_pattern, expected_base, sram_buffer,
         0U, two_sectors_bytes, FLAG_SW
     );
 
-end:
     PRINTF("\n--------TEST FINISHED--------\n");
     if (errors == 0) {
         PRINTF("All tests passed!\n");
