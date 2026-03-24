@@ -101,14 +101,16 @@ static int compare_buffers(const void *expected, const void *actual, uint32_t le
     const uint8_t *expected_bytes = (const uint8_t *)(void *)expected;
     const uint8_t *actual_bytes   = (const uint8_t *)(void *)actual;
 
+    int error = 0;
+
     for (uint32_t i = 0; i < len; ++i) {
         if (expected_bytes[i] != actual_bytes[i]) {
             PRINTF("Mismatch at %d: expected 0x%x, got 0x%x\n", i, expected_bytes[i], actual_bytes[i]);
-            return 1;
+            error = 1;
         }
     }
 
-    return 0;
+    return error;
 }
 
 /**
@@ -238,17 +240,17 @@ int main(void) {
         0U, two_sectors_bytes, FLAG_INT
     );
     errors += run_case(
-        "6) Hardware Write, standard speed, DMA, interrupt, two sectors, 2nd time overwritting previous data",
+        "7) Hardware Write, standard speed, DMA, interrupt, two sectors, 2nd time overwritting previous data",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, two_sectors_bytes, FLAG_INT
     );
     errors += run_case(
-        "7) Hardware Write, standard speed, DMA, interrupt, unaligned single sector",
+        "8) Hardware Write, standard speed, DMA, interrupt, unaligned single sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
     );
     errors += run_case(
-        "8) Hardware Write, standard speed, DMA, interrupt, unaligned cross sector",
+        "9) Hardware Write, standard speed, DMA, interrupt, unaligned cross sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
     );
@@ -257,61 +259,61 @@ int main(void) {
 
     // Hardware Write, quad speed, DMA, no interrupt
     errors += run_case(
-        "9) Hardware Write, quad speed, DMA, single sector",
+        "10) Hardware Write, quad speed, DMA, single sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, SECTOR_SIZE_BYTES, FLAG_QUAD
     );
     errors += run_case(
-        "10) Hardware Write, quad speed, DMA, two sectors",
+        "11) Hardware Write, quad speed, DMA, two sectors",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, two_sectors_bytes, FLAG_QUAD
     );
     errors += run_case(
-        "10) Hardware Write, quad speed, DMA, two sectors, 2nd time overwritting previous data",
+        "12) Hardware Write, quad speed, DMA, two sectors, 2nd time overwritting previous data",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, two_sectors_bytes, FLAG_QUAD
     );
     errors += run_case(
-        "11) Hardware Write, quad speed, DMA, unaligned single sector",
+        "13) Hardware Write, quad speed, DMA, unaligned single sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD
     );
     errors += run_case(
-        "12) Hardware Write, quad speed, DMA, unaligned cross sector",
+        "14) Hardware Write, quad speed, DMA, unaligned cross sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD
     );
 
     // Hardware Write, quad speed, DMA, interrupt
     errors += run_case(
-        "13) Hardware Write, quad speed, DMA, interrupt, single sector",
+        "15) Hardware Write, quad speed, DMA, interrupt, single sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, SECTOR_SIZE_BYTES, FLAG_QUAD | FLAG_INT
     );
     errors += run_case(
-        "14) Hardware Write, quad speed, DMA, interrupt, two sectors",
+        "16) Hardware Write, quad speed, DMA, interrupt, two sectors",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, two_sectors_bytes, FLAG_QUAD | FLAG_INT
     );
     errors += run_case(
-        "14) Hardware Write, quad speed, DMA, interrupt, two sectors, 2nd time overwritting previous data",
+        "17) Hardware Write, quad speed, DMA, interrupt, two sectors, 2nd time overwritting previous data",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, two_sectors_bytes, FLAG_QUAD | FLAG_INT
     );
     errors += run_case(
-        "15) Hardware Write, quad speed, DMA, interrupt, unaligned single sector",
+        "18) Hardware Write, quad speed, DMA, interrupt, unaligned single sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
     );
     errors += run_case(
-        "16) Hardware Write, quad speed, DMA, interrupt, unaligned cross sector",
+        "19) Hardware Write, quad speed, DMA, interrupt, unaligned cross sector",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
     );
 
     // Final check: test that dma is still working
     errors += run_case(
-        "17) Manual dma copy",
+        "20) Manual dma copy",
         sram_source_pattern, flash_ptr_buffer, sram_buffer, expected_base,
         0U, two_sectors_bytes, FLAG_SW
     );
