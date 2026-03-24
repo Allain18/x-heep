@@ -23,6 +23,7 @@
 #include "rv_plic.h" // For PLIC functions
 #include "w25q128jw.h"
 #include "dma.h"
+#include "timer_sdk.h"
 
 /* By default, printfs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
@@ -86,7 +87,7 @@ __attribute__ ((noinline)) void w25q128jw_controller_run(char use_interrupt, cha
 
 int main(void) {
 
-    uint32_t res;
+    uint32_t res, time_tick = 0;
     int32_t error = 0;
 
     // Initialize the DMA
@@ -127,22 +128,30 @@ int main(void) {
     CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);   // Global interrupt enable for machine mode (MIE) bit in Machine Status Registers
     CSR_SET_BITS(CSR_REG_MIE, (1 << 11)); // Machine External Interrupt Enable (MEIE) bit in Machine Interrupt Pending Register
 
+    timer_cycles_init();
+    timer_start();
     w25q128jw_controller_run(1, 0, flash_ptr_test1);
+    time_tick = timer_get_cycles();
+    PRINTF("Time taken for HW write with interrupt: %d cycles\n", time_tick);
 
     PRINTF("TEST 2\n");
     for(int i=0;i<NUM_WORDS;i++)
        sram_data[i] = MAGIC_TEST_NUM + (2*i);
-    w25q128jw_controller_run(1, 0, flash_ptr_test2);
-    memset(sram_buffer_read_flash_back, 0, LENGTH_BYTES);
-    //change sram_data
-    
+    // w25q128jw_controller_run(1, 0, flash_ptr_test2);
+    timer_cycles_init();
+    timer_start();
+    w25q128jw_erase_and_write_standard_dma(flash_buffer_test2, sram_data, LENGTH_BYTES);
+    time_tick = timer_get_cycles();
+    PRINTF("Time taken for HW write with interrupt: %d cycles\n", time_tick);
 
 
     PRINTF("Test 2: Hardware Read, standard speed, DMA, no interrupt\n");
-    // First, check that the Flash has been programmed/initialized correctly
-    // we read in SW as we assume the SW is the golden model
+    timer_cycles_init();
+    timer_start();
     w25q128jw_controller_read((void*) &sram_buffer_read_flash_back[0], (void*) &flash_ptr_test1[0], LENGTH_BYTES,0);
     while(!w25q128jw_controller_is_ready_polling());
+    time_tick = timer_get_cycles();
+    PRINTF("Time taken for HW write with interrupt: %d cycles\n", time_tick);
 
     for(int i=0;i<NUM_WORDS;i++){
         sram_data[i] = 0x1000 + i;
