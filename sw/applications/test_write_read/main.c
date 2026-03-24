@@ -140,7 +140,7 @@ int main(void) {
     // w25q128jw_controller_run(1, 0, flash_ptr_test2);
     timer_cycles_init();
     timer_start();
-    w25q128jw_erase_and_write_standard_dma(flash_buffer_test2, sram_data, LENGTH_BYTES);
+    w25q128jw_erase_and_write_standard_dma((uint32_t)flash_buffer_test2, sram_data, LENGTH_BYTES);
     time_tick = timer_get_cycles();
     PRINTF("Time taken for HW write with interrupt: %d cycles\n", time_tick);
 
