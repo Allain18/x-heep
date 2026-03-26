@@ -23,6 +23,11 @@
 #include "w25q128jw.h"
 #include "dma.h"
 
+/* Set to 1 if running on Verilator, 0 otherwise (QuestaSim or FPGA)
+    It skips unsupported test cases (e.g., quad write)
+*/
+#define SIM_VERILATOR 1
+
 /* Write operation flags */
 #define FLAG_SW    (1)       /* Software write (default HW) */
 #define FLAG_INT   (1 << 1)  /* Interrupt-driven write (default no interrupts) */
@@ -32,7 +37,7 @@
 
 /* By default, printfs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
-#define PRINTF_IN_SIM   1
+#define PRINTF_IN_SIM   0
 
 #if TARGET_SIM && PRINTF_IN_SIM
         #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
@@ -263,7 +268,7 @@ int main(void) {
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
     );
 
-    //goto end;
+    #if SIM_VERILATOR == 0
 
     // Hardware Write, quad speed, DMA, no interrupt
     errors += run_case(
@@ -319,6 +324,8 @@ int main(void) {
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
     );
 
+    #endif // SIM_VERILATOR
+
     // Final check: test that dma is still working
     errors += run_case(
         "20) Manual dma copy",
@@ -326,7 +333,6 @@ int main(void) {
         0U, two_sectors_bytes, FLAG_SW
     );
 
-end:
     PRINTF("\n--------TEST FINISHED--------\n");
     if (errors == 0) {
         PRINTF("All tests passed!\n");
