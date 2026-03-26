@@ -51,56 +51,83 @@ void handler_irq_w25q128jw_controller(uint32_t id) {
     w25q128jw_controller_clear_status_register();
 }
 
+/**
+ * @brief Perform a read operation from flash to SRAM, either using software or hardware read.
+ * @param flash_src: Flash pointer
+ * @param sram_dst: SRAM pointer
+ * @param len: number of bytes to read
+ * @param flags: read operation flags (e.g., FLAG_SW, FLAG_INT, FLAG_QUAD)
+ * @return 0 if the read operation is successful, 1 otherwise.
+ */
 static int do_read(
-    const void *src, void *dst, uint32_t len, uint32_t flags
+    const void *flash_src, void *sram_dst, uint32_t len, uint32_t flags
 ) {
     w25q_error_codes_t status = FLASH_OK;
 
     if (flags & FLAG_SW) {
         // Software read (standard speed, no interrupts, with DMA)
-        status = w25q128jw_read_standard_dma((uint32_t)(uintptr_t)src, (void *)dst, len, 0, 0);
+        status = w25q128jw_read_standard_dma((uint32_t)(uintptr_t)flash_src, (void *)sram_dst, len, 0, 0);
         return (status == FLASH_OK) ? 0 : 1;
     } else {
         // Hardware read (using the controller)
         uint32_t interrupts = (flags & FLAG_INT)  ? 1U : 0U;
         uint32_t quad       = (flags & FLAG_QUAD) ? 1U : 0U;
 
-        w25q128jw_controller_read((void *)dst, (void *)src, len, interrupts, quad);
+        w25q128jw_controller_read((void *)sram_dst, (void *)flash_src, len, interrupts, quad);
         return 0;
     }
 }
 
+/**
+ * @brief Compare two buffers (byte by byte) and print mismatches.
+ * @return 0 if the buffers match, 1 if there is a mismatch.
+ */
 static int compare_buffers(const void *expected, const void *actual, uint32_t len) {
     const uint8_t *expected_bytes = (const uint8_t *)(void *)expected;
     const uint8_t *actual_bytes   = (const uint8_t *)(void *)actual;
 
+    int error = 0;
+
     for (uint32_t i = 0; i < len; ++i) {
         if (expected_bytes[i] != actual_bytes[i]) {
             PRINTF("Mismatch at %d: expected 0x%x, got 0x%x\n", i, expected_bytes[i], actual_bytes[i]);
-            return 1;
+            error = 1;
         }
     }
 
-    return 0;
+    return error;
 }
 
+/**
+ * @brief Run a test case for reading from flash and verifying the contents.
+ * @param name: test case name for logging
+ * @param flash_src_base: base pointer for source data (Flash)
+ * @param sram_expected_base: base pointer for expected data (SRAM)
+ * @param sram_buffer: base pointer for read back data (SRAM)
+ * @param offset: offset in bytes to apply to the base pointers for this test case
+ * @param len: number of bytes to read
+ * @param flags: read operation flags (e.g., FLAG_SW, FLAG_INT, FLAG_QUAD)
+ * @return 0 if the read operation and verification are successful, 1 otherwise.
+ */
 static int run_case(
     const char *name,
-    const void *src_base,
-    const void *expected_base,
-    void *read_base,
+    const void *flash_src_base,
+    const void *sram_expected_base,
+    void *sram_buffer,
     uint32_t offset,
     uint32_t len,
     uint32_t flags
 ) {
-    void *src      = (void *)((char *)src_base      + offset);
-    void *expected = (void *)((char *)expected_base + offset);
+    void *src      = (void *)((char *)flash_src_base     + offset);
+    void *dst      = (void *)((char *)sram_buffer        + offset);
+    void *expected = (void *)((char *)sram_expected_base + offset);
 
-    memset((void *)read_base, 0, len);
+    memset((void *)dst, 0, len);
 
     PRINTF("%s: ", name);
 
-    if (do_read(src, read_base, len, flags) != 0) {
+    // Step 1: Read from Flash -> SRAM
+    if (do_read(src, dst, len, flags) != 0) {
         PRINTF("read operation failed\n");
 
         #if STOP_ON_FAILURE
@@ -110,9 +137,10 @@ static int run_case(
         #endif
     }
 
-    if (compare_buffers(expected, read_base, len) != 0) {
+    // Step 2: Compare read back data with expected data
+    if (compare_buffers(expected, dst, len) != 0) {
         PRINTF("FAIL\n");
-        
+
         #if STOP_ON_FAILURE
             exit(EXIT_FAILURE);
         #else
@@ -129,9 +157,9 @@ int main(void) {
     const uint32_t two_sectors_bytes = 2U * SECTOR_SIZE_BYTES;
 
     // Random unaligned offset and length for testing reads
-    const uint32_t unaligned_single_sector_offset_bytes = 43U;
-    const uint32_t unaligned_cross_sector_offset_bytes = SECTOR_SIZE_BYTES - 37U;
-    const uint32_t unaligned_length_bytes = 113U;
+    const uint32_t unaligned_single_sector_offset_bytes = 0x2bU;
+    const uint32_t unaligned_cross_sector_offset_bytes = SECTOR_SIZE_BYTES - 0x25U;
+    const uint32_t unaligned_length_bytes = 0x71U;
 
     // Initialize the DMA
     dma_init(NULL);

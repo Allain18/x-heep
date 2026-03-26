@@ -54,10 +54,12 @@ void handler_irq_w25q128jw_controller(uint32_t id) {
 }
 
 /**
+ * @brief Perform a write operation from SRAM to FLASH, either using software or hardware write.
  * @param sram_src: SRAM pointer
  * @param flash_dst: Flash pointer
  * @param len: number of bytes to write
  * @param flags: write operation flags (e.g., FLAG_SW, FLAG_INT, FLAG_QUAD)
+ * @return 0 if the write operation is successful, 1 otherwise.
  */
 static int do_write(
     const void *sram_src, void *flash_dst, uint32_t len, uint32_t flags
@@ -97,6 +99,10 @@ static int safe_read(
     return (status == FLASH_OK) ? 0 : 1;
 }
 
+/**
+ * @brief Compare two buffers (byte by byte) and print mismatches.
+ * @return 0 if the buffers match, 1 if there is a mismatch.
+ */
 static int compare_buffers(const void *expected, const void *actual, uint32_t len) {
     const uint8_t *expected_bytes = (const uint8_t *)(void *)expected;
     const uint8_t *actual_bytes   = (const uint8_t *)(void *)actual;
@@ -114,6 +120,7 @@ static int compare_buffers(const void *expected, const void *actual, uint32_t le
 }
 
 /**
+ * @brief Run a test case for writing to flash and verifying the contents.
  * @param name: test case name for logging
  * @param src_base: base pointer for source data (SRAM)
  * @param dst_base: base pointer for destination data (Flash)
@@ -122,6 +129,7 @@ static int compare_buffers(const void *expected, const void *actual, uint32_t le
  * @param offset: offset in bytes to apply to the base pointers for this test case
  * @param len: number of bytes to write/read
  * @param flags: write operation flags (e.g., FLAG_SW, FLAG_INT, FLAG_QUAD)
+ * @return 0 if the write operation and verification are successful, 1 otherwise.
  */
 static int run_case(
     const char *name,
@@ -183,9 +191,9 @@ int main(void) {
     const uint32_t two_sectors_bytes = 2U * SECTOR_SIZE_BYTES;
 
     // Random unaligned offset and length for testing reads
-    const uint32_t unaligned_single_sector_offset_bytes = 43U;
-    const uint32_t unaligned_cross_sector_offset_bytes = SECTOR_SIZE_BYTES - 37U;
-    const uint32_t unaligned_length_bytes = 113U;
+    const uint32_t unaligned_single_sector_offset_bytes = 0x2bU;
+    const uint32_t unaligned_cross_sector_offset_bytes = SECTOR_SIZE_BYTES - 0x25U;
+    const uint32_t unaligned_length_bytes = 0x71U;
 
     // Initialize the DMA
     dma_init(NULL);
