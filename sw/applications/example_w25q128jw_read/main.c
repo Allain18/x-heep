@@ -20,6 +20,11 @@
 #include "w25q128jw.h"
 #include "dma.h"
 
+/* Set to 1 if running on Verilator, 0 otherwise (QuestaSim or FPGA)
+    It skips unsupported test cases (e.g., quad read)
+*/
+#define SIM_VERILATOR 1
+
 /* Read operation flags */
 #define FLAG_SW    (1)       /* Software read (default HW) */
 #define FLAG_INT   (1 << 1)  /* Interrupt-driven read (default no interrupts) */
@@ -29,7 +34,7 @@
 
 /* By default, printfs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
-#define PRINTF_IN_SIM   1
+#define PRINTF_IN_SIM   0
 
 #if TARGET_SIM && PRINTF_IN_SIM
     #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
@@ -221,6 +226,8 @@ int main(void) {
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
     );
 
+    #if SIM_VERILATOR == 0
+
     // Hardware Read, quad speed, DMA, no interrupt
     errors += run_case(
         "9) Hardware Read, quad speed, DMA, single sector",
@@ -264,6 +271,8 @@ int main(void) {
         flash_ptr_source_pattern, expected_base, sram_buffer,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
     );
+
+    #endif // SIM_VERILATOR
 
     // Final check: test that dma is still working
     errors += run_case(
