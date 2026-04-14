@@ -16,7 +16,6 @@
 
 #include "core_v_mini_mcu.h"
 #include "x-heep.h"
-#include "w25q128jw.h"
 
 #include "w25q128jw_controller.h"
 #include "data.h"
@@ -44,7 +43,7 @@
 #define PRINTF_IN_SIM   0
 
 #if TARGET_SIM && PRINTF_IN_SIM
-        #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
+    #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
 #elif PRINTF_IN_FPGA && !TARGET_SIM
     #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
 #else
