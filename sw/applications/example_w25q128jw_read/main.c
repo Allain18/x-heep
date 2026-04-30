@@ -35,6 +35,8 @@
 #define FLAG_INT   (1 << 1)  /* Interrupt-driven read (default no interrupts) */
 #define FLAG_QUAD  (1 << 2)  /* Quad SPI mode (default single mode) */
 
+#define SRAM_GUARD_PATTERN 0xA5U
+
 #define STOP_ON_FIRST_FAILURE 1    /* Stop on first failure (1) or run all tests (0) */
 
 /* By default, printfs are activated for FPGA and disabled for simulation. */
@@ -110,6 +112,34 @@ static int compare_buffers(const void *expected, const void *actual, uint32_t le
 }
 
 /**
+ * @brief Verify that bytes outside [offset, offset + len) still contain the guard pattern.
+ * @return 0 if guard regions are intact, 1 otherwise.
+ */
+static int verify_guard_regions(
+    const void *buffer,
+    uint32_t buffer_len,
+    uint32_t offset,
+    uint32_t len,
+    uint8_t guard_pattern
+) {
+    const uint8_t *bytes = (const uint8_t *)(void *)buffer;
+    int error = 0;
+
+    for (uint32_t i = 0; i < buffer_len; ++i) {
+        if (i >= offset && i < (offset + len)) {
+            continue;
+        }
+
+        if (bytes[i] != guard_pattern) {
+            PRINTF("Guard mismatch at %d: expected 0x%x, got 0x%x\n", i, guard_pattern, bytes[i]);
+            error = 1;
+        }
+    }
+
+    return error;
+}
+
+/**
  * @brief Run a test case for reading from flash and verifying the contents.
  * @param name: test case name for logging
  * @param flash_src_base: base pointer for source data (Flash)
@@ -129,11 +159,13 @@ static int run_case(
     uint32_t len,
     uint32_t flags
 ) {
+    const uint32_t sram_buffer_len = NUM_BYTES;
+
     void *src      = (void *)((char *)flash_src_base     + offset);
     void *dst      = (void *)((char *)sram_buffer        + offset);
     void *expected = (void *)((char *)sram_expected_base + offset);
 
-    memset((void *)dst, 0, len);
+    memset((void *)sram_buffer, SRAM_GUARD_PATTERN, sram_buffer_len);
 
     PRINTF("%d) %s: ", test_counter++, name);
 
@@ -159,8 +191,110 @@ static int run_case(
         #endif
     }
 
+    // Step 3: Verify that no bytes outside the requested range were modified
+    if (verify_guard_regions(sram_buffer, sram_buffer_len, offset, len, SRAM_GUARD_PATTERN) != 0) {
+        PRINTF("FAIL (guard region modified)\n");
+
+        #if STOP_ON_FIRST_FAILURE
+            exit(EXIT_FAILURE);
+        #else
+            return 1;
+        #endif
+    }
+
     PRINTF("PASS\n");
     return 0;
+}
+
+/**
+ * @brief Run the standard set of read tests for a given mode.
+ * @return Number of failing test cases.
+ */
+static uint32_t run_mode_tests(
+    const char *mode_name,
+    const void *flash_src_base,
+    const void *sram_expected_base,
+    void *sram_buffer,
+    uint32_t two_sectors_bytes,
+    uint32_t unaligned_single_sector_offset_bytes,
+    uint32_t unaligned_cross_sector_offset_bytes,
+    uint32_t unaligned_length_bytes,
+    uint32_t flags
+) {
+    uint32_t errors = 0;
+    char test_name[96];
+
+    snprintf(test_name, sizeof(test_name), "%s, single sector", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        0U, SECTOR_SIZE_BYTES, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, two sectors", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        0U, two_sectors_bytes, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, single byte (1st within the word)", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        0U, 1U, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, single byte (2nd within the word)", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        1U, 1U, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, single byte (3rd within the word)", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        2U, 1U, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, single byte (4th within the word)", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        3U, 1U, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, 2 bytes (with head+tail)", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        3U, 2U, flags
+    );
+    
+    snprintf(test_name, sizeof(test_name), "%s, 6 bytes (with head+body+tail)", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        2U, 8U, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, 7 bytes (with body+tail)", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        4U, 7U, flags
+    );
+
+    snprintf(test_name, sizeof(test_name), "%s, unaligned cross sector", mode_name);
+    errors += run_case(
+        test_name,
+        flash_src_base, sram_expected_base, sram_buffer,
+        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, flags
+    );
+
+    return errors;
 }
 
 int main(void) {
@@ -189,114 +323,46 @@ int main(void) {
     // SW read: assumed to be correct to initialize the expected buffer
     do_read(flash_ptr_source_pattern, (void *)expected_base, two_sectors_bytes, FLAG_SW);
 
-    // Hardware Read, standard speed, DMA, no interrupt
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, single sector",
+    errors += run_mode_tests(
+        "Hardware Read, standard speed, DMA",
         flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, SECTOR_SIZE_BYTES, 0U
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, two sectors",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, two_sectors_bytes, 0U
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, single byte",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, 1U, 0U
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, unaligned single sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, unaligned_length_bytes, 0U
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, unaligned cross sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, 0U
+        two_sectors_bytes,
+        unaligned_single_sector_offset_bytes,
+        unaligned_cross_sector_offset_bytes,
+        unaligned_length_bytes,
+        0U
     );
 
-    // Hardware Read, standard speed, DMA, interrupt
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, interrupt, single sector",
+    errors += run_mode_tests(
+        "Hardware Read, standard speed, DMA, interrupt",
         flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, SECTOR_SIZE_BYTES, FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, interrupt, two sectors",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, two_sectors_bytes, FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, interrupt, single byte",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, 1U, FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, interrupt, unaligned single sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, standard speed, DMA, interrupt, unaligned cross sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_INT
+        two_sectors_bytes,
+        unaligned_single_sector_offset_bytes,
+        unaligned_cross_sector_offset_bytes,
+        unaligned_length_bytes,
+        FLAG_INT
     );
 
     #if SIM_VERILATOR == 0
 
-    // Hardware Read, quad speed, DMA, no interrupt
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, single sector",
+    errors += run_mode_tests(
+        "Hardware Read, quad speed, DMA",
         flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, SECTOR_SIZE_BYTES, FLAG_QUAD
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, two sectors",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, two_sectors_bytes, FLAG_QUAD
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, single byte",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, 1U, FLAG_QUAD
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, unaligned single sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, unaligned cross sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD
+        two_sectors_bytes,
+        unaligned_single_sector_offset_bytes,
+        unaligned_cross_sector_offset_bytes,
+        unaligned_length_bytes,
+        FLAG_QUAD
     );
 
-    // Hardware Read, quad speed, DMA, interrupt
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, interrupt, single sector",
+    errors += run_mode_tests(
+        "Hardware Read, quad speed, DMA, interrupt",
         flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, SECTOR_SIZE_BYTES, FLAG_QUAD | FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, interrupt, two sectors",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        0U, two_sectors_bytes, FLAG_QUAD | FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, interrupt, single byte",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, 1U, FLAG_QUAD | FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, interrupt, unaligned single sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_single_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
-    );
-    errors += run_case(
-        "Hardware Read, quad speed, DMA, interrupt, unaligned cross sector",
-        flash_ptr_source_pattern, expected_base, sram_buffer,
-        unaligned_cross_sector_offset_bytes, unaligned_length_bytes, FLAG_QUAD | FLAG_INT
+        two_sectors_bytes,
+        unaligned_single_sector_offset_bytes,
+        unaligned_cross_sector_offset_bytes,
+        unaligned_length_bytes,
+        FLAG_QUAD | FLAG_INT
     );
 
     #endif // SIM_VERILATOR
