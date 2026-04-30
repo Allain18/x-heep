@@ -1282,7 +1282,7 @@ module w25q128jw_controller
               set_dma_regs(reg2hw.md_address.q + md_offset_q,
                            reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h1,
                            32'h1,  // 1-byte transfer
-                           2'h0, 2'h2,  // src_data_type=32-bit (MD), dst_data_type=8-bit (SRAM)
+                           2'h2, 2'h2,  // src_data_type=32-bit (MD), dst_data_type=8-bit (SRAM)
                            'h0, 'h0, 'h0, {14'h0, head_bytes_q});
             end else begin
               // No head to transfer, go directly to body
@@ -1368,7 +1368,7 @@ module w25q128jw_controller
               set_dma_regs(reg2hw.md_address.q + md_offset_q,
                            reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h1,
                            32'h1,  // 1-byte transfer
-                           2'h0, 2'h2,  // src_data_type=32-bit (MD), dst_data_type=8-bit (SRAM)
+                           2'h2, 2'h2,  // src_data_type=32-bit (MD), dst_data_type=8-bit (SRAM)
                            'h0, 'h0, 'h0, tail_bytes_q);
 
               modify_state_d = MODIFY_TAIL_TRANS;
