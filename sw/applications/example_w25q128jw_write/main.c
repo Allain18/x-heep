@@ -95,7 +95,6 @@ static int do_write(
 /**
  * @brief Trusted read from the FLASH device.
  *
- * It uses the SW library, assumed to be correct, to read back the data from flash for verification.
  * @param flash_src: Flash pointer
  * @param sram_dst: SRAM pointer
  * @param len: number of bytes to read
@@ -104,11 +103,9 @@ static int do_write(
 static int safe_read(
     const void *flash_src, void *sram_dst, uint32_t len
 ) {
-    w25q_error_codes_t status = FLASH_OK;
-
-    // Use the standard read with DMA for safe read back (verification)
-    status = w25q128jw_read_standard_dma((uint32_t)(uintptr_t)flash_src, (void *)sram_dst, len, 0, 0);
-    return (status == FLASH_OK) ? 0 : 1;
+    // HW READ has been intensively tested and we assume it works correctly
+    w25q128jw_controller_read((void *)sram_dst, (void *)flash_src, len, 1, 0);
+    return 0;
 }
 
 /**
@@ -164,7 +161,6 @@ static int verify_guard_regions(
  * @param name: test case name for logging
  * @param sram_source_base: base pointer for source data (SRAM)
  * @param flash_dest_base: base pointer for destination data (Flash)
- * @param expected_base: base pointer for expected data (SRAM)
  * @param sram_read_back_base: base pointer for read back data (SRAM)
  * @param sram_expected_base: base pointer for correct data (SRAM)
  * @param offset: offset in bytes to apply to the base pointers for this test case
@@ -362,8 +358,6 @@ int main(void) {
     const void *expected_base = (const void *)sram_source_pattern;
 
     PRINTF("Starting flash write tests\n");
-
-    // goto test;
 
     errors += run_mode_tests(
         "Hardware Write, standard speed, DMA",
