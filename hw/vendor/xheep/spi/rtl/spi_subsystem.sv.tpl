@@ -126,6 +126,10 @@ module spi_subsystem
       .reg_req_i(flash_ctr_reg_req_i),
       .reg_rsp_o(flash_ctr_reg_rsp_o),
 
+      // Memory mapped SPI
+      .spimemio_req_i(spimemio_req_i),
+      .spimemio_resp_o(spimemio_resp_o),
+
       // Interrupt signal
       .w25q128jw_controller_intr_o,
 
