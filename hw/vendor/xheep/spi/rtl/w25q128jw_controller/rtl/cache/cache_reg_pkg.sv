@@ -11,6 +11,7 @@ package cache_reg_pkg;
   parameter int N_WAYS_WIDTH = (N_WAYS > 1) ? $clog2(N_WAYS) : 1;
   parameter int N_SETS_WIDTH = (N_SETS > 1) ? $clog2(N_SETS) : 1;
   parameter int SECTOR_SIZE_BYTES_WIDTH = (SECTOR_SIZE_BYTES > 1) ? $clog2(SECTOR_SIZE_BYTES) : 1;
+  parameter int SECTOR_SIZE_WORDS_WIDTH = (SECTOR_SIZE_WORDS > 1) ? $clog2(SECTOR_SIZE_WORDS) : 1;
 
   parameter int TAG_WIDTH            = 32 - N_SETS_WIDTH - SECTOR_SIZE_BYTES_WIDTH;
   parameter int SECTOR_ADDRESS_WIDTH = 32 - SECTOR_SIZE_BYTES_WIDTH;
