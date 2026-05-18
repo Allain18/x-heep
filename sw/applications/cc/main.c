@@ -33,7 +33,8 @@ int32_t __attribute__((section(".xheep_data_flash_only"))) __attribute__ ((align
 
 int main(void)
 {
-    uint32_t v;
+    uint32_t v32;
+    uint8_t v8;
     uintptr_t base = 0x40000000; // Base address for memory-mapped SPI flash
 
     uint32_t data_read_back[4] = {0};
@@ -47,33 +48,26 @@ int main(void)
     int32_t* flash_ptr_test1 = heep_get_flash_address_offset(flash_buffer_test1);
 
     uintptr_t offset = (uintptr_t)flash_ptr_test1;
-    volatile uint32_t *ptr = (uint32_t *)(base + offset);
-    // uint32_t *ptr = (uint32_ts *)(base);
+    volatile uint8_t *ptr8 = (uint8_t *)(base + offset);
+    volatile uint32_t *ptr32 = (uint32_t *)(base + offset);
 
-
-    PRINTF("%p\n", flash_ptr_test1); //e940
-    PRINTF("%p\n", flash_buffer_test1);
-    PRINTF("0x%x\n", base);
-    PRINTF("%p\n", ptr);
-
-    PRINTF("Read test values...\n");
-
-    
+    PRINTF("Read words software...\n");
     uint32_t flash_addr = (uint32_t)flash_ptr_test1;
     for(int i=0; i < 4; i++)
     {
-        w25q128jw_read_standard(flash_addr+4*i, data_read_back, 4);
-        PRINTF("0x%x\n", data_read_back[0]);
+        w25q128jw_read_standard(flash_addr+4*i, &data_read_back[i], 4);
+        PRINTF("0x%x\n", data_read_back[i]);
     }
 
+    PRINTF("Read obi words...\n");
     for(int i = 0; i < 4; i++) {
-        // v = flash_ptr_test1[i];
-        v = ptr[i];
-        PRINTF("0x%08x\n", v);
+        v32 = ptr32[i];
+        PRINTF("0x%x\n", v32);
     }
-    // for(int i = 0; i < 4; i++) {
-    //     v = ptr[-i];
-    //     PRINTF("0x%08x\n", v);
-    // }
+    PRINTF("Read obi bytes...\n");
+    for(int i = 0; i < 16; i++) {
+        v8 = ptr8[i];
+        PRINTF("0x%x\n", v8);
+    }
     return 0;
 }
