@@ -59,7 +59,7 @@ int main(void)
     PRINTF("Read test values...\n");
 
     
-    uint32_t flash_addr = flash_ptr_test1;
+    uint32_t flash_addr = (uint32_t)flash_ptr_test1;
     for(int i=0; i < 4; i++)
     {
         w25q128jw_read_standard(flash_addr+4*i, data_read_back, 4);
