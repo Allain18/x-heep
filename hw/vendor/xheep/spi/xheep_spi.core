@@ -11,7 +11,6 @@ filesets:
   files_rtl:
     depend:
       - pulp-platform.org::register_interface
-      - yosyshq:picorv32_spimemio:0-r1
       - lowrisc:ip:spi_host:1.0
     files:
     - rtl/spi_subsystem.sv
