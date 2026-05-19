@@ -113,7 +113,6 @@ module w25q128jw_controller
   // Top controller FSM
   typedef enum logic [2:0] {
     TOP_IDLE,     // Wait for start command
-    TOP_MEMIO_READ_CACHE, // Return data from previous read directly from register (memio fast-path)
     TOP_READ,     // Read from flash to RAM sector buffer
     TOP_FWAIT,    // Wait for flash internal operation
     TOP_ERASE,    // Erase flash sector
@@ -390,24 +389,13 @@ module w25q128jw_controller
         if (reg2hw.control.start.q) begin
           top_state_d = TOP_READ;  // Always start with READ (for both read and write operations)
         end else if (spimemio_req_i.req) begin
+          memio_addr_d = spimemio_req_i.addr;
+          // memio_be = spimemio_req_i.be;
           spimemio_resp_o.gnt = 1'b1;
-          if (memio_addr_q == spimemio_req_i.addr) begin
-            // If new memio request has the same address as the previous one, we can directly return the data without re-triggering a SPI read
-            top_state_d = TOP_MEMIO_READ_CACHE;
-          end else begin
-            memio_addr_d = spimemio_req_i.addr;
-            // Enable memio fast-path so READ FSM will return RX data directly into resp.rdata
-            memio_mode_d = 1'b1;
-            top_state_d = TOP_READ;
-          end
+          // Enable memio fast-path so READ FSM will return RX data directly into resp.rdata
+          memio_mode_d = 1'b1;
+          top_state_d = TOP_READ;
         end
-      end
-
-      // -------- MEMIO FAST-PATH: Return data from previous read directly from register --------
-      TOP_MEMIO_READ_CACHE: begin
-        spimemio_resp_o.rdata = memio_data_q;
-        spimemio_resp_o.rvalid = 1'b1;
-        top_state_d = TOP_IDLE;
       end
 
       // ============================================================================
@@ -423,6 +411,7 @@ module w25q128jw_controller
           // -------- IDLE: Trigger DMA initialization --------
           READ_IDLE: begin
             if (memio_mode_q) begin
+              spimemio_resp_o.gnt = 1'b0;
               read_state_d = READ_SPI_CHECK_TX_FIFO;
             end
             else begin
