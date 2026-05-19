@@ -26,9 +26,7 @@ filesets:
     - lowrisc:ip:rv_timer:0.1
     - lowrisc:ip:spi_host:1.0
     - lowrisc:ip:i2c:0.1
-    - yosyshq:picorv32_spimemio:0-r1
     - x-heep:ip:cv32e40px
-    - x-heep:obi_spimemio:0.1.0
     - x-heep:ip:boot_rom
     - x-heep:ip:dma
     - x-heep:ip:dma_subsystem
@@ -84,7 +82,6 @@ filesets:
     - hw/core-v-mini-mcu/core_v_mini_mcu.vlt
     - hw/ip/soc_ctrl/soc_ctrl.vlt
     - hw/ip/boot_rom/boot_rom.vlt
-    - hw/ip/obi_spimemio/obi_spimemio.vlt
     - hw/ip/dma_subsystem/dma_subsystem.vlt
     - hw/ip/pdm2pcm/pdm2pcm.vlt
     - hw/ip_examples/pdm2pcm_dummy/pdm2pcm_dummy.vlt
