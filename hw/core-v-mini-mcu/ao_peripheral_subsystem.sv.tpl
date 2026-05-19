@@ -39,7 +39,7 @@ module ao_peripheral_subsystem
     input  obi_req_t  spimemio_req_i,
     output obi_resp_t spimemio_resp_o,
 
-    // SPI Interface to flash (YosysHW SPI and OpenTitan SPI multiplexed)
+    // SPI Interface to flash OpenTitan
     output logic                               spi_flash_sck_o,
     output logic                               spi_flash_sck_en_o,
     output logic [spi_host_reg_pkg::NumCS-1:0] spi_flash_csb_o,
@@ -142,7 +142,6 @@ module ao_peripheral_subsystem
   tlul_pkg::tl_d2h_t rv_timer_tl_d2h;
 
   /* SPI memory signals */
-  logic use_spimemio;
   logic spi_flash_rx_valid;
   logic spi_flash_tx_ready;
 
@@ -318,7 +317,6 @@ module ao_peripheral_subsystem
       .boot_select_i,
       .execute_from_flash_i,
       .xheep_instance_id_i,
-      .use_spimemio_o(use_spimemio),
       .exit_valid_o,
       .exit_value_o
   );
@@ -334,11 +332,8 @@ module ao_peripheral_subsystem
   spi_subsystem spi_subsystem_i (
       .clk_i,
       .rst_ni,
-      .use_spimemio_i(use_spimemio),
       .spimemio_req_i,
       .spimemio_resp_o,
-      .yo_reg_req_i(ao_peripheral_slv_req[core_v_mini_mcu_pkg::SPI_MEMIO_IDX]),
-      .yo_reg_rsp_o(ao_peripheral_slv_rsp[core_v_mini_mcu_pkg::SPI_MEMIO_IDX]),
       .ot_reg_req_i(ao_peripheral_slv_req[core_v_mini_mcu_pkg::SPI_FLASH_IDX]),
       .ot_reg_rsp_o(ao_peripheral_slv_rsp[core_v_mini_mcu_pkg::SPI_FLASH_IDX]),
 % if base_peripheral_domain.contains_peripheral('w25q128jw_controller'):

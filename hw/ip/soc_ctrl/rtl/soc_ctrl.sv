@@ -17,7 +17,6 @@ module soc_ctrl #(
 
     input logic boot_select_i,
     input logic execute_from_flash_i,
-    output logic use_spimemio_o,
     input logic [31:0] xheep_instance_id_i,
 
     output logic        exit_valid_o,
@@ -70,7 +69,6 @@ module soc_ctrl #(
 
   assign exit_valid_o   = reg2hw.exit_valid.q;
   assign exit_value_o   = reg2hw.exit_value.q;
-  assign use_spimemio_o = reg2hw.use_spimemio.q;
   assign enable_spi_sel = reg2hw.enable_spi_sel.q;
 
   always_comb begin

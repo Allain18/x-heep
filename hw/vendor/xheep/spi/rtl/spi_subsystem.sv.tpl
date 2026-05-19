@@ -14,18 +14,14 @@ module spi_subsystem
     input logic clk_i,
     input logic rst_ni,
 
-    input logic use_spimemio_i,
-
     // Memory mapped SPI
     input  obi_req_t  spimemio_req_i,
     output obi_resp_t spimemio_resp_o,
 
-    // Yosys SPI configuration
-    input  reg_req_t  yo_reg_req_i,
-    output reg_rsp_t  yo_reg_rsp_o,
     // OpenTitan SPI configuration
     input  reg_req_t  ot_reg_req_i,
     output reg_rsp_t  ot_reg_rsp_o,
+    
     // w25q128jw flash controller configuration
     input  reg_req_t  flash_ctr_reg_req_i,
     output reg_rsp_t  flash_ctr_reg_rsp_o,
