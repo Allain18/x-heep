@@ -66,15 +66,6 @@
         { bits: "0", name: "USE_SPIMEMIO", desc: "Spi Select Reg" }
       ]
     }
-    { name:     "ENABLE_SPI_SEL"
-      desc:     "Enable Spi module selection from software"
-      resval:   "0x0"
-      swaccess: "rw"
-      hwaccess: "hro"
-      fields: [
-        { bits: "0", name: "ENABLE_SPI_SEL", desc: "Enable Spi Select Reg" }
-      ]
-    }
     { name:     "SYSTEM_FREQUENCY_HZ"
       desc:     "System Frequency Value - Used to know and set at which frequency the system is running (in Hz)"
       resval:   "0x1"

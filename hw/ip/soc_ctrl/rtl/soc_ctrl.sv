@@ -25,8 +25,6 @@ module soc_ctrl #(
 
   import soc_ctrl_reg_pkg::*;
 
-  logic enable_spi_sel;
-
   soc_ctrl_reg2hw_t reg2hw;
   soc_ctrl_hw2reg_t hw2reg;
   reg_rsp_t reg_rsp_int;
@@ -51,7 +49,7 @@ module soc_ctrl #(
   assign hw2reg.boot_select.de  = 1'b1;
   assign hw2reg.boot_select.d   = boot_select_i;
 
-  assign hw2reg.use_spimemio.de = ~enable_spi_sel;
+  assign hw2reg.use_spimemio.de = 1'b1;
   assign hw2reg.use_spimemio.d  = execute_from_flash_i;
 
   soc_ctrl_reg_top #(
@@ -67,9 +65,8 @@ module soc_ctrl #(
       .devmode_i(1'b1)
   );
 
-  assign exit_valid_o   = reg2hw.exit_valid.q;
-  assign exit_value_o   = reg2hw.exit_value.q;
-  assign enable_spi_sel = reg2hw.enable_spi_sel.q;
+  assign exit_valid_o = reg2hw.exit_valid.q;
+  assign exit_value_o = reg2hw.exit_value.q;
 
   always_comb begin
     reg_rsp_o = reg_rsp_int;
