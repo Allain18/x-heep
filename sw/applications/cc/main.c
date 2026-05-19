@@ -34,6 +34,7 @@ int32_t __attribute__((section(".xheep_data_flash_only"))) __attribute__ ((align
 int main(void)
 {
     uint32_t v32;
+    uint16_t v16;
     uint8_t v8;
     uintptr_t base = 0x40000000; // Base address for memory-mapped SPI flash
 
@@ -49,13 +50,14 @@ int main(void)
 
     uintptr_t offset = (uintptr_t)flash_ptr_test1;
     volatile uint8_t *ptr8 = (uint8_t *)(base + offset);
+    volatile uint16_t *ptr16 = (uint16_t *)(base + offset);
     volatile uint32_t *ptr32 = (uint32_t *)(base + offset);
 
     PRINTF("Read words software...\n");
     uint32_t flash_addr = (uint32_t)flash_ptr_test1;
+    w25q128jw_read_standard(flash_addr, data_read_back, 16);
     for(int i=0; i < 4; i++)
     {
-        w25q128jw_read_standard(flash_addr+4*i, &data_read_back[i], 4);
         PRINTF("0x%x\n", data_read_back[i]);
     }
 
@@ -64,6 +66,13 @@ int main(void)
         v32 = ptr32[i];
         PRINTF("0x%x\n", v32);
     }
+
+    PRINTF("Read obi short...\n");
+    for(int i = 0; i < 8; i++) {
+        v16 = ptr16[i];
+        PRINTF("0x%x\n", v16);
+    }
+
     PRINTF("Read obi bytes...\n");
     for(int i = 0; i < 16; i++) {
         v8 = ptr8[i];
