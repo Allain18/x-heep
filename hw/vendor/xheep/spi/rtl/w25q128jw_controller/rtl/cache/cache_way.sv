@@ -1,3 +1,11 @@
+/**
+ * This module contains the metadata for each of the cache ways.
+ * It is used to check a hit/miss, if the line is dirty and which line to replace
+ * if needed.
+ *
+ * The cache data lives in `cache.sv`.
+ */
+
 module cache_way
   import cache_reg_pkg::*;
 (
@@ -39,31 +47,24 @@ module cache_way
   end
 
   always_comb begin
+    valid_d = valid_q;
+    dirty_d = dirty_q;
 
+    // TODO: update valid+tag
+    unique case (request_i.op)
+      CACHE_WRITE: begin
+        if (hit) begin
+          dirty_q[current_set] = 1'b1;
+        end
+      end
+
+      default: ;
+    endcase
   end
 
-  tc_sram #(
-    .NumWords (N_SETS * SECTOR_SIZE_WORDS),
-    .DataWidth(WORD_SIZE_BITS),
-    .ByteWidth(32'd8),
-    .NumPorts (32'd1),
-    .Latency (32'd1)
-  ) tc_ram_i (
-    .clk_i  (clk_i),
-    .rst_ni (rst_ni),
-    .req_i  (mem_req),
-    .we_i   (mem_we),
-    .addr_i (mem_addr),
-    .wdata_i(mem_wdata),
-    .be_i   (mem_be),
-    // output ports
-    .rdata_o(rdata_o)
-  );
-
   assign response_o.hit = hit;
+  assign response_o.rdata = data[current_set];
   assign response_o.miss_info.dirty = dirty;
-  assign response_o.miss_info.victim_sector = {tags[prev_set], prev_set};
-
-  assign data_o = data[current_set];
+  assign response_o.miss_info.victim_sector = {tags[current_set], current_set};
 
 endmodule
