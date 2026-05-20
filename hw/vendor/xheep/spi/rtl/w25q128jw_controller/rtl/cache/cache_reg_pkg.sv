@@ -28,7 +28,8 @@ package cache_reg_pkg;
     } internal;
   } address_t;
 
-  typedef enum logic [1:0] {
+  typedef enum logic [2:0] {
+    CACHE_IDLE,
     CACHE_READ,   // lookup + read word if hit
     CACHE_WRITE,  // lookup + write word if hit
     CACHE_FILL,   // stream word from DMA -> cache (when filling from FLASH)
@@ -37,6 +38,7 @@ package cache_reg_pkg;
 
   // Cache request
   typedef struct packed {
+    logic                                 req;   // high on a new request, for 1 cycle
     cache_op_e                            op;
     address_t                             addr;
     logic [31:0]                          wdata; // data in case of a write
@@ -51,8 +53,6 @@ package cache_reg_pkg;
 
   typedef struct packed {
     logic                                 hit; // 1 if hit, 0 if miss
-    logic [31:0]                          rdata; // read data in case of hit
-    logic                                 rvalid; // read data is valid
     eviction_info_t                       miss_info; // Only in case of miss, to handle eviction
   } cache_res_t;
 
