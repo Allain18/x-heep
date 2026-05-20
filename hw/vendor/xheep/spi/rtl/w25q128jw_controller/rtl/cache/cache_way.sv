@@ -13,6 +13,7 @@ module cache_way
   input  logic                            rst_ni,
 
   input  cache_req_t                      request_i,
+  input  logic                            last_sector_word_i,
 
   output logic                            hit_o,
   output logic                            dirty_o,
@@ -49,20 +50,33 @@ module cache_way
 
     for (int i = 0; i < N_SETS; i++) tags_d[i] = tags_q[i];
 
-    unique case (request_i.op)
-      CACHE_WRITE: begin
-        if (hit_o) begin
-          dirty_q[current_set] = 1'b1;
+    if (request_i.req) begin
+      unique case (request_i.op)
+        CACHE_WRITE: begin
+          if (hit_o) begin
+            dirty_d[current_set] = 1'b1;
+          end
         end
-      end
 
-      CACHE_FILL: begin
-        // TODO: on last request (cache line is full)
-        // must set valid=1, dirty=0, tag=TAG
-      end
+        CACHE_FILL: begin
+          // Sector is now fully in cache (valid, not dirty)
+          if (last_sector_word_i) begin
+            valid_d[current_set] = 1'b1;
+            dirty_d[current_set] = 1'b0;
+            tags_d[current_set]  = current_tag;
+          end
+        end
 
-      default: ;
-    endcase
+        CACHE_EVICT: begin
+          // Sector is now fully evicted (not valid)
+          if (last_sector_word_i) begin
+            valid_d[current_set] = 1'b0;
+          end
+        end
+
+        default: ;
+      endcase
+    end
   end
 
   assign hit_o   = valid_q[current_set] & (tags_q[current_set] == current_tag);
