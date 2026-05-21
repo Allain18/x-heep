@@ -46,7 +46,7 @@ package cache_reg_pkg;
   typedef struct packed {
     logic                                 req;   // high on a new request, for 1 cycle
     cache_op_e                            op;
-    address_t                             addr;
+    addr_t                                addr;
     logic [31:0]                          wdata; // data in case of a write
     logic [3:0]                           be;    // byte-enable of wdata
   } cache_req_t;
