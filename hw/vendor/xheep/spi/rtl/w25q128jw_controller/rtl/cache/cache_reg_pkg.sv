@@ -14,19 +14,25 @@ package cache_reg_pkg;
   parameter int SECTOR_SIZE_BYTES_WIDTH = (SECTOR_SIZE_BYTES > 1) ? $clog2(SECTOR_SIZE_BYTES) : 1; // 12
   parameter int SECTOR_SIZE_WORDS_WIDTH = (SECTOR_SIZE_WORDS > 1) ? $clog2(SECTOR_SIZE_WORDS) : 1; // 10
 
-  parameter int TAG_WIDTH            = 32 - N_SETS_WIDTH - SECTOR_SIZE_BYTES_WIDTH; // 18
-  parameter int SECTOR_ADDRESS_WIDTH = 32 - SECTOR_SIZE_BYTES_WIDTH; // 20
+  parameter int ADDR_WIDTH           = 24; // FLASH memory is 16MiB, byte-addressable
+  parameter int TAG_WIDTH            = ADDR_WIDTH - N_SETS_WIDTH - SECTOR_SIZE_BYTES_WIDTH; // 10
+  parameter int SECTOR_ADDRESS_WIDTH = ADDR_WIDTH - SECTOR_SIZE_BYTES_WIDTH; // 12
+
+  parameter int N_WORDS = N_SETS * SECTOR_SIZE_WORDS;
+
+  parameter type data_t = logic [WORD_SIZE_BITS-1:0];
+  parameter type be_t   = logic [((WORD_SIZE_BITS + BYTE_SIZE_BITS - 1'd1) / BYTE_SIZE_BITS)-1:0]; // ceil_div
 
   typedef union packed {
-    logic [31:0] exposed;
+    logic [ADDR_WIDTH-1:0] exposed;
 
-    // Packed fields: tag[31:14] | set[13:12] | byte_offset[11:0]
+    // Packed fields: tag[23:14] | set[13:12] | byte_offset[11:0]
     struct packed {
       logic [TAG_WIDTH-1:0]               tag;
       logic [N_SETS_WIDTH-1:0]            set;
       logic [SECTOR_SIZE_BYTES_WIDTH-1:0] byte_offset;
     } internal;
-  } address_t;
+  } addr_t;
 
   typedef enum logic [2:0] {
     CACHE_IDLE,
