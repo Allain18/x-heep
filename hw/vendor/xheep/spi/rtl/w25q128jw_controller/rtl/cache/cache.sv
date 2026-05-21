@@ -8,16 +8,17 @@ module cache
   import cache_reg_pkg::*;
   import obi_pkg::*;
 #(
-  parameter int unsigned NumWords  = N_SETS * SECTOR_SIZE_WORDS,
-  parameter int unsigned DataWidth = WORD_SIZE_BITS,
-  parameter int unsigned ByteWidth = BYTE_SIZE_BITS,
+  parameter int unsigned NumWords    = N_SETS * SECTOR_SIZE_WORDS,
+  parameter int unsigned DataWidth   = WORD_SIZE_BITS,
+  parameter int unsigned ByteWidth   = BYTE_SIZE_BITS,
+  parameter int unsigned SramLatency = 32'd1;
 
   // DEPENDENT PARAMETERS, DO NOT OVERWRITE!
-  parameter int unsigned AddrWidth = (NumWords > 32'd1) ? $clog2(NumWords) : 32'd1,
-  parameter int unsigned BeWidth   = (DataWidth + ByteWidth - 32'd1) / ByteWidth, // ceil_div
-  parameter type         addr_t    = logic [AddrWidth-1:0],
-  parameter type         data_t    = logic [DataWidth-1:0],
-  parameter type         be_t      = logic [BeWidth-1:0]
+  parameter int unsigned AddrWidth   = (NumWords > 32'd1) ? $clog2(NumWords) : 32'd1,
+  parameter int unsigned BeWidth     = (DataWidth + ByteWidth - 32'd1) / ByteWidth, // ceil_div
+  parameter type         addr_t      = logic [AddrWidth-1:0],
+  parameter type         data_t      = logic [DataWidth-1:0],
+  parameter type         be_t        = logic [BeWidth-1:0]
 ) (
   input  logic           clk_i,
   input  logic           rst_ni,
@@ -54,10 +55,12 @@ module cache
   be_t   mem_be,    mem_be_q,    mem_be_d;
   data_t mem_rdata;
 
+  logic                   gnt;
+  logic [SramLatency-1:0] rvalid;
+
   assign req_tag      = controller_req_i.addr.internal.tag;
   assign req_set      = controller_req_i.addr.internal.set;
   assign req_word_off = controller_req_i.addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
-  assign last_sector_word = word_counter_q == SECTOR_SIZE_WORDS_WIDTH'(SECTOR_SIZE_WORDS - 1);
 
   // Pointer update
   always_ff @(posedege clk_i or negedge rst_ni) begin
@@ -72,14 +75,23 @@ module cache
 
   always_comb begin
     word_counter_d = word_counter_q;
+    last_sector_word = word_counter_q == SECTOR_SIZE_WORDS_WIDTH'(SECTOR_SIZE_WORDS - 1);
 
     if (controller_req_i.req) begin
       active_op_d = controller_req_i.op;
     end
 
-    if (dma.done) begin
-      word_counter_d = word_counter_q + 1'b1;
-    end
+    unique case (active_op_q)
+      CACHE_FILL, CACHE_EVICT: begin
+        word_counter_d = word_counter_q + 1'b1;
+
+        if (last_sector_word) begin
+          active_op_d = CACHE_IDLE;
+        end
+      end
+
+      default: ;
+    endcase
   end
 
   // SRAM Accesses
@@ -111,7 +123,7 @@ module cache
         CACHE_FILL: begin
           mem_req = 1'b1;
           mem_we  = 1'b1;
-          mem_addr = {req_tag, req_set, word_counter_d};
+          mem_addr = {req_tag, req_set, word_counter_q};
           mem_wdata = controller_req_i.wdata;
           mem_be  = 4'b1111;
         end
@@ -119,7 +131,7 @@ module cache
         CACHE_EVICT: begin
           mem_req = 1'b1;
           mem_we  = 1'b0;
-          mem_addr = {req_tag, req_set, word_counter_d};
+          mem_addr = {req_tag, req_set, word_counter_q};
           mem_wdata = controller_req_i.wdata;
           mem_be  = 4'b1111;
         end
@@ -129,6 +141,18 @@ module cache
     end
   end
 
+  // SRAM valid signal
+  assign gnt = dma_req_i.req; // grant directly on the request
+
+  always_ff @ (posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      rvalid <= SramLatency'h0;
+    end else begin
+      rvalid <= (rvalid << 1) | gnt;
+    end
+  end
+
+  // Cache instantiation
   cache_way way (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
@@ -141,12 +165,13 @@ module cache
     .victim_sector_o(victim_sector)
   );
 
+  // Cache data (SRAM bank) instantiation
   tc_sram #(
     .NumWords (NumWords),       // Number of Words in data array
     .DataWidth(DataWidth),      // Data signal width (in bits)
     .ByteWidth(ByteWidth),      // Width of a data byte (in bits)
     .NumPorts (N_WAYS),         // Number of read and write ports
-    .Latency  (32'd1)           // Latency when the read data is available
+    .Latency  (SramLatency)     // Latency when the read data is available
   ) cache_data (
     .clk_i  (clk_i),
     .rst_ni (rst_ni),
@@ -162,6 +187,9 @@ module cache
   // Output assignments
 
   // DMA response
+  assign dma_resp_o.gnt = gnt;
+  assign dma_resp_o.rvalid = rvalid[SramLatency-1];
+  assign dma_resp_o.rdata  = mem_rdata;
 
   // Controller response
   assign controller_resp_o.hit = hit;
