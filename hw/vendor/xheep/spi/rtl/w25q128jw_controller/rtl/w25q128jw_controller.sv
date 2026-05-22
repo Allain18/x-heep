@@ -335,6 +335,9 @@ module w25q128jw_controller
 
   assign spi_host_reg_req_o.addr = SPI_FLASH_START_ADDRESS + {{(32 - spi_host_reg_pkg::BlockAw){1'b0}}, spi_host_reg_req_offset};
 
+  logic quad_select;
+  assign quad_select = reg2hw.control.quad.q & QUAD_AVAILABLE;
+  
   // FSM combinational logic
   always_comb begin
     dma_init_state_d = dma_init_state_q;
@@ -484,7 +487,7 @@ module w25q128jw_controller
             // See hw/vendor/lowrisc_opentitan_spi_host/data/spi_host.hjson for status register bit mapping
             // See hw/vendor/lowrisc_opentitan_spi_host/rtl/spi_host_reg_pkg.sv for TXQD depth definition
             if (external_spi_host_hw2reg_status_i.txqd.d < SPI_FLASH_TX_FIFO_DEPTH[7:0]) begin
-              if ((memio_mode_q && QUAD_AVAILABLE) || reg2hw.control.quad.q) begin
+              if ((memio_mode_q && QUAD_AVAILABLE) || quad_select) begin
                 read_state_d = READ_SPI_SEND_CMD_1_QUAD;
               end else begin
                 read_state_d = READ_SPI_FILL_TX_FIFO;
@@ -1292,7 +1295,7 @@ module w25q128jw_controller
             // Compute page address: sector base + sector offset + page offset
             flash_address = ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q) |
                   ({28'h0, page_cnt_q} << 8);
-            if (reg2hw.control.quad.q) begin
+            if (quad_select) begin
               spi_host_reg_req_o.wdata = (bitfield_byteswap32(flash_address) & 32'hffffff00) |
                   {19'h0, FC_PPQ};
             end else begin
@@ -1398,7 +1401,7 @@ module w25q128jw_controller
             spi_host_reg_req_o.valid = 1'b1;
             spi_host_reg_req_o.wdata = spi_cmd_pack(
               SPI_DIR_TX,
-              reg2hw.control.quad.q ? SPI_SPEED_QUAD : SPI_SPEED_STD,
+              quad_select ? SPI_SPEED_QUAD : SPI_SPEED_STD,
               1'b0,
               {
                 11'b0, PAGE_BSIZE - 1'h1
