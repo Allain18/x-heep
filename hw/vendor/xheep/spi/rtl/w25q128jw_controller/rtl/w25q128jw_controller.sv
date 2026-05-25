@@ -511,6 +511,8 @@ module w25q128jw_controller
             spi_host_reg_req_o.valid = 1'b1;
             if (memio_state_q == MEMIO_READ) begin
               flash_address = memio_addr_q & 32'h00ffffff;
+            end else if (memio_state_q == MEMIO_WRITE) begin
+              flash_address = memio_addr_q & 32'h00fff000;
             end else if (reg2hw.control.rnw.q) begin
               flash_address = reg2hw.f_address.q & 32'h00ffffff;
             end else begin
@@ -577,6 +579,7 @@ module w25q128jw_controller
               spi_host_reg_req_o.wdata =
                   spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, {11'b0, SE_BSIZE - 1'h1});
             end
+            
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
               if (memio_state_q == MEMIO_READ) begin
                 // For memory-mapped single read: wait for RX watermark then read RXDATA directly
