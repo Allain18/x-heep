@@ -501,7 +501,7 @@ module w25q128jw_controller
             // See hw/vendor/lowrisc_opentitan_spi_host/data/spi_host.hjson for status register bit mapping
             // See hw/vendor/lowrisc_opentitan_spi_host/rtl/spi_host_reg_pkg.sv for TXQD depth definition
             if (external_spi_host_hw2reg_status_i.txqd.d < SPI_FLASH_TX_FIFO_DEPTH[7:0]) begin
-              if ((memio_state_q == MEMIO_READ && QUAD_AVAILABLE) || quad_select) begin
+              if ((memio_state_q != MEMIO_IDLE && QUAD_AVAILABLE) || quad_select) begin
                 read_state_d = READ_SPI_SEND_CMD_1_QUAD;
               end else begin
                 read_state_d = READ_SPI_FILL_TX_FIFO;
@@ -696,6 +696,8 @@ module w25q128jw_controller
 
             if (memio_state_q == MEMIO_READ) begin
               flash_address = memio_addr_q & 32'h00ffffff;
+            end else if (memio_state_q == MEMIO_WRITE) begin
+              flash_address = memio_addr_q & 32'h00fff000;
             end else if (reg2hw.control.rnw.q) begin
               // READ: Use exact flash address from F_ADDRESS register
               flash_address = reg2hw.f_address.q & 32'h00ffffff;
@@ -765,6 +767,7 @@ module w25q128jw_controller
               spi_host_reg_req_o.wdata =
                   spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_QUAD, 1'b0, {11'b0, SE_BSIZE - 1'h1});
             end
+            
             if (memio_state_q == MEMIO_READ) begin
                 // For memory-mapped single read: wait for RX watermark then read RXDATA directly
                 read_state_d = READ_MEMIO_SET_RXWM_R;
