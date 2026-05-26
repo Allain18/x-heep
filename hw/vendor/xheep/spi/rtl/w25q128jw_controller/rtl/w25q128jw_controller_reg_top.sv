@@ -101,6 +101,7 @@ module w25q128jw_controller_reg_top #(
   logic [7:0] dma_slot_wait_counter_qs;
   logic [7:0] dma_slot_wait_counter_wd;
   logic dma_slot_wait_counter_we;
+  logic [31:0] address_memio_write_qs;
 
   // Register instances
   // R[control]: V(False)
@@ -399,9 +400,35 @@ module w25q128jw_controller_reg_top #(
   );
 
 
+  // R[address_memio_write]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RO"),
+    .RESVAL  (32'h0)
+  ) u_address_memio_write (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    .we     (1'b0),
+    .wd     ('0  ),
+
+    // from internal hardware
+    .de     (hw2reg.address_memio_write.de),
+    .d      (hw2reg.address_memio_write.d ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.address_memio_write.q ),
+
+    // to register interface (read)
+    .qs     (address_memio_write_qs)
+  );
 
 
-  logic [8:0] addr_hit;
+
+
+  logic [9:0] addr_hit;
   always_comb begin
     addr_hit = '0;
     addr_hit[0] = (reg_addr == W25Q128JW_CONTROLLER_CONTROL_OFFSET);
@@ -413,6 +440,7 @@ module w25q128jw_controller_reg_top #(
     addr_hit[6] = (reg_addr == W25Q128JW_CONTROLLER_INTR_STATUS_OFFSET);
     addr_hit[7] = (reg_addr == W25Q128JW_CONTROLLER_INTR_ENABLE_OFFSET);
     addr_hit[8] = (reg_addr == W25Q128JW_CONTROLLER_DMA_SLOT_WAIT_COUNTER_OFFSET);
+    addr_hit[9] = (reg_addr == W25Q128JW_CONTROLLER_ADDRESS_MEMIO_WRITE_OFFSET);
   end
 
   assign addrmiss = (reg_re || reg_we) ? ~|addr_hit : 1'b0 ;
@@ -428,7 +456,8 @@ module w25q128jw_controller_reg_top #(
                (addr_hit[5] & (|(W25Q128JW_CONTROLLER_PERMIT[5] & ~reg_be))) |
                (addr_hit[6] & (|(W25Q128JW_CONTROLLER_PERMIT[6] & ~reg_be))) |
                (addr_hit[7] & (|(W25Q128JW_CONTROLLER_PERMIT[7] & ~reg_be))) |
-               (addr_hit[8] & (|(W25Q128JW_CONTROLLER_PERMIT[8] & ~reg_be)))));
+               (addr_hit[8] & (|(W25Q128JW_CONTROLLER_PERMIT[8] & ~reg_be))) |
+               (addr_hit[9] & (|(W25Q128JW_CONTROLLER_PERMIT[9] & ~reg_be)))));
   end
 
   assign control_start_we = addr_hit[0] & reg_we & !reg_error;
@@ -504,6 +533,10 @@ module w25q128jw_controller_reg_top #(
 
       addr_hit[8]: begin
         reg_rdata_next[7:0] = dma_slot_wait_counter_qs;
+      end
+
+      addr_hit[9]: begin
+        reg_rdata_next[31:0] = address_memio_write_qs;
       end
 
       default: begin

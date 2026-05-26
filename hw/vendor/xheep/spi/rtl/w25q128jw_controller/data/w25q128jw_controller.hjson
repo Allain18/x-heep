@@ -86,5 +86,14 @@
         { bits: "7:0", name: "DMA_SLOT_WAIT_COUNTER", desc: "A DMA counter used to wait before submitting the next req when using slots"}
       ]
     }
+    { name:    "ADDRESS_MEMIO_WRITE"
+      desc:    '''Address for memio write operation with DMA'''
+      swaccess: "ro"
+      hwaccess: "hrw"
+      resval:        0
+      fields: [
+        { bits: "31:0", name: "ADDRESS_MEMIO_WRITE", desc: "Address for memio write operation with DMA"}
+      ]
+    }
   ]
 }
