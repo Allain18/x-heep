@@ -46,11 +46,9 @@ module soc_ctrl #(
   assign hw2reg.boot_exit_loop.de = 1'b0;
 `endif
 
-  assign hw2reg.boot_select.de  = 1'b1;
-  assign hw2reg.boot_select.d   = boot_select_i;
+  assign hw2reg.boot_select.de = 1'b1;
+  assign hw2reg.boot_select.d  = boot_select_i;
 
-  assign hw2reg.use_spimemio.de = 1'b1;
-  assign hw2reg.use_spimemio.d  = execute_from_flash_i;
 
   soc_ctrl_reg_top #(
       .reg_req_t(reg_req_t),

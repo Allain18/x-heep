@@ -240,10 +240,6 @@ w25q_error_codes_t w25q128jw_init(spi_host_t* spi_host) {
      * Check if memory mapped SPI is enabled. Current version of the bsp
      * does not support memory mapped SPI.
     */
-    // Keep for the moment 
-    if (soc_ctrl_peri->USE_SPIMEMIO == 1) {
-        return FLASH_ERROR; // Error
-    }
 
     if (soc_ctrl_peri->BOOT_SELECT == 0) {            
         // Set the global spi variable to the one passed as argument.
