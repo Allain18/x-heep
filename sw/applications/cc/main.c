@@ -11,6 +11,7 @@
 #include "core_v_mini_mcu.h"
 #include "x-heep.h"
 #include "w25q128jw.h"
+#include "w25q128jw_controller.h"
 
 
 
