@@ -146,3 +146,14 @@ void w25q128jw_set_dma_slot_wait_counter(uint32_t slot_wait_counter)
 {
     w25q128jw_controller_peri->DMA_SLOT_WAIT_COUNTER = slot_wait_counter;
 }
+
+/**
+ * @brief Set buffer address for MEMIO write operations
+ */
+void w25q128jw_set_buffer()
+{
+    w25q128jw_controller_peri->S_ADDRESS = (uint32_t)w25q128jw_sector_data_buffer;
+    
+    // Tell the DMA to accept write operations from w25q128jw_controller in HW
+    dma_set_hw_configuration_mode(1,0);
+}

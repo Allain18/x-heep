@@ -96,4 +96,9 @@ void w25q128jw_controller_write(void* dest, void* src, size_t length_bytes, uint
 */
 void w25q128jw_set_dma_slot_wait_counter(uint32_t slot_wait_counter);
 
+/**
+ * @brief Set buffer address for MEMIO write operations
+ */
+void w25q128jw_set_buffer();
+
 #endif // W25Q128JW_CONTROLLER_H
