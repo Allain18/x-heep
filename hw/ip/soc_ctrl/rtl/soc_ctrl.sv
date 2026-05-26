@@ -16,7 +16,6 @@ module soc_ctrl #(
     output reg_rsp_t reg_rsp_o,
 
     input logic boot_select_i,
-    input logic execute_from_flash_i,
     input logic [31:0] xheep_instance_id_i,
 
     output logic        exit_valid_o,
