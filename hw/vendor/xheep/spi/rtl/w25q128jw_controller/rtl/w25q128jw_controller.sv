@@ -1337,7 +1337,7 @@ module w25q128jw_controller
               flash_address = ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q) |
                   ({28'h0, page_cnt_q} << 8);
             end
-            if (quad_select) begin
+            if (quad_select || (memio_state_q == MEMIO_WRITE && QUAD_AVAILABLE)) begin
               spi_host_reg_req_o.wdata = (bitfield_byteswap32(flash_address) & 32'hffffff00) |
                   {19'h0, FC_PPQ};
             end else begin
@@ -1443,7 +1443,7 @@ module w25q128jw_controller
             spi_host_reg_req_o.valid = 1'b1;
             spi_host_reg_req_o.wdata = spi_cmd_pack(
               SPI_DIR_TX,
-              quad_select ? SPI_SPEED_QUAD : SPI_SPEED_STD,
+              (quad_select || (memio_state_q == MEMIO_WRITE && QUAD_AVAILABLE)) ? SPI_SPEED_QUAD : SPI_SPEED_STD,
               1'b0,
               {
                 11'b0, PAGE_BSIZE - 1'h1
