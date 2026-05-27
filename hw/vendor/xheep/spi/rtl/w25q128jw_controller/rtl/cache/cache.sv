@@ -85,7 +85,9 @@ module cache
       active_op_d    = controller_req_i.op;
       target_set_d   = controller_req_i.addr.internal.set;
       target_tag_d   = controller_req_i.addr.internal.tag;
-      word_counter_d = '0;
+
+      // Start at requested word offset within sector
+      word_counter_d = controller_req_i.mem_addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
     end else begin
       unique case (active_op_q)
         CACHE_FILL, CACHE_EVICT: begin
