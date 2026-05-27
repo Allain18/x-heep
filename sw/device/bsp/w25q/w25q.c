@@ -256,14 +256,14 @@ w25q_error_codes_t w25q128jw_init(spi_host_t* spi_host) {
 
         // Set CSID
         spi_set_csid(spi, 0);
-
-        // Power up flash
-        flash_power_up();
-
-        // Set QE bit
-        if (set_QE_bit() == FLASH_ERROR) return FLASH_ERROR; // Error occurred while setting QE bit
-
     }
+
+    // Power up flash
+    flash_power_up();
+
+    // Set QE bit
+    if (set_QE_bit() == FLASH_ERROR) return FLASH_ERROR; // Error occurred while setting QE bit
+
     return FLASH_OK; // Success
 }
 
