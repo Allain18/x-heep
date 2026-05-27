@@ -1,8 +1,8 @@
 /*
  * Simple test for OBI -> W25Q128JW register bridge
  *
- * This program writes and reads a few controller registers via the
- * memory-mapped flash OBI window. Adjust `W25Q_BASE` if your map differs.
+ * This program writes and reads the W25Q128JW flash memory through the OBI interface
+ * Bus NEEDS to be NtoM to be able to write.
  */
 
 #include <stdint.h>
@@ -27,8 +27,8 @@
     #define PRINTF(...)
 #endif
 
-int32_t __attribute__((section(".xheep_data_flash_only"))) __attribute__ ((aligned (16))) flash_buffer_test1[4] = {
-0xDEADBEEFu, 0xCAFEBABEu, 0xFEEDFACEu, 0xBAADF00Du
+int32_t __attribute__((section(".xheep_data_flash_only"))) __attribute__ ((aligned (16))) flash_buffer_test1[5] = {
+0xDEADBEEFu, 0xCAFEBABEu, 0xFEEDFACEu, 0xBAADF00Du, 0xE4F1BA5Eu
 };
 
 
@@ -37,9 +37,9 @@ int main(void)
     uint32_t v32;
     uint16_t v16;
     uint8_t v8;
-    uintptr_t base = 0x40000000; // Base address for memory-mapped SPI flash
+    uintptr_t base = FLASH_MEM_START_ADDRESS; // Base address for memory-mapped SPI flash
 
-    uint32_t data_read_back[4] = {0x9, 0x21, 0x43, 0x65};
+    uint32_t data_write_buffer[4] = {0x9, 0x21, 0x43, 0x65};
 
     spi_host_t* spi;
     spi = spi_flash;
@@ -58,28 +58,34 @@ int main(void)
 
 
     PRINTF("Write flash with controller...\n");
-    w25q128jw_controller_write((void*)flash_addr, (void*)data_read_back, 16, 0);
+    w25q128jw_controller_write((void*)flash_addr, (void*)data_write_buffer, 16, 0);
     while(!w25q128jw_controller_is_ready_polling());
 
     w25q128jw_set_buffer();
     PRINTF("Write obi word...\n");
     ptr32[0] = 0x12345678u;
 
-
     PRINTF("Read obi words...\n");
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 5; i++) {
         v32 = ptr32[i];
         PRINTF("0x%x\n", v32);
     }
 
+    PRINTF("Write obi short...\n");
+    ptr16[3] = 0x1234u;
+    ptr16[4] = 0xA1A2u;
+
     PRINTF("Read obi short...\n");
-    for(int i = 0; i < 8; i++) {
+    for(int i = 0; i < 10; i++) {
         v16 = ptr16[i];
         PRINTF("0x%x\n", v16);
     }
 
+    PRINTF("Write obi byte...\n");
+    ptr8[10] = 0x99u;
+
     PRINTF("Read obi bytes...\n");
-    for(int i = 0; i < 16; i++) {
+    for(int i = 0; i < 20; i++) {
         v8 = ptr8[i];
         PRINTF("0x%x\n", v8);
     }
