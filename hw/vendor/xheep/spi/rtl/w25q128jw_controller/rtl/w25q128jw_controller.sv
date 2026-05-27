@@ -294,6 +294,8 @@ module w25q128jw_controller
   // memio fast-path
   logic [31:0] memio_addr_q, memio_addr_d;
   logic [31:0] memio_data_q, memio_data_d;
+  logic [ 3:0] memio_be;
+  logic [31:0] memio_write_offset;
   memio_state_e memio_state_q, memio_state_d;
 
   // FSM sequential logic
@@ -412,13 +414,56 @@ module w25q128jw_controller
         end else if (spimemio_req_i.req) begin
           memio_addr_d = spimemio_req_i.addr;
           memio_data_d = spimemio_req_i.wdata;
-          hw2reg.address_memio_write.de = 1'b1;
-          hw2reg.address_memio_write.d = spimemio_req_i.wdata;
 
-          // Set length to single word
+          hw2reg.address_memio_write.de = 1'b1;
           hw2reg.length.de = 1'b1;
-          hw2reg.length.d = 32'd4;
-          // memio_be = spimemio_req_i.be;
+          case (spimemio_req_i.be)
+            4'h1: begin
+              // Byte 0
+              hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[7:0]};
+              hw2reg.length.d = 32'd1;
+              memio_write_offset = 0;
+            end
+            4'h2: begin
+              // Byte 1
+              hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[15:8]};
+              hw2reg.length.d = 32'd1;
+              memio_write_offset = 1;
+            end
+            4'h3: begin
+              // Bytes 0-1
+              hw2reg.address_memio_write.d = {16'h0, spimemio_req_i.wdata[15:0]};
+              hw2reg.length.d = 32'd2;
+              memio_write_offset = 0;
+            end
+            4'h4: begin
+              // Byte 2
+              hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[23:16]};
+              hw2reg.length.d = 32'd1;
+              memio_write_offset = 2;
+            end
+            4'h8: begin
+              // Byte 3
+              hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[31:24]};
+              hw2reg.length.d = 32'd1;
+              memio_write_offset = 3;
+            end
+            4'hC: begin
+              // Bytes 2-3
+              hw2reg.address_memio_write.d = {16'h0, spimemio_req_i.wdata[31:16]};
+              hw2reg.length.d = 32'd2;
+              memio_write_offset = 2;
+            end
+            default: begin
+              // All bytes (0-3)
+              hw2reg.address_memio_write.d = spimemio_req_i.wdata;
+              hw2reg.length.d = 32'd4;
+              memio_write_offset = 0;
+            end
+          endcase
+          // hw2reg.address_memio_write.d = spimemio_req_i.wdata;
+
+          memio_be = spimemio_req_i.be;
           spimemio_resp_o.gnt = 1'b1;
 
           memio_state_d = spimemio_req_i.we ? MEMIO_WRITE : MEMIO_READ;
@@ -1169,28 +1214,86 @@ module w25q128jw_controller
             external_dma_hw2reg_o.src_ptr.de = 1'b1;
             // Source = MD_ADDRESS + offset for current sector iteration (for multi-sector writes)
             // F_ADDRESS not necessarily sector aligned and such case must be taken into consideration
-            if (memio_state_q == MEMIO_WRITE) begin
-              external_dma_hw2reg_o.src_ptr.d  = W25Q128JW_CONTROLLER_START_ADDRESS + {26'b0, W25Q128JW_CONTROLLER_ADDRESS_MEMIO_WRITE_OFFSET};
-            end else begin
-              external_dma_hw2reg_o.src_ptr.d = reg2hw.md_address.q + md_offset_q;
-            end
             //Set DMA destination pointer: RAM sector buffer
             external_dma_hw2reg_o.dst_ptr.de = 1'b1;
-            external_dma_hw2reg_o.dst_ptr.d = reg2hw.s_address.q + sector_offset;
+            if (memio_state_q == MEMIO_WRITE) begin
+              external_dma_hw2reg_o.src_ptr.d  = W25Q128JW_CONTROLLER_START_ADDRESS + {26'b0, W25Q128JW_CONTROLLER_ADDRESS_MEMIO_WRITE_OFFSET};
+              external_dma_hw2reg_o.dst_ptr.d = reg2hw.s_address.q + sector_offset + memio_write_offset;
+            end else begin
+              external_dma_hw2reg_o.src_ptr.d = reg2hw.md_address.q + md_offset_q;
+              external_dma_hw2reg_o.dst_ptr.d = reg2hw.s_address.q + sector_offset;
+            end
+
             // Destination = S_ADDRESS + offset within sector (for first iteration only, otherwise sector_offset = 0)
             // F_ADDRESS not necessarily sector aligned and such case must be taken into consideration
-            //Set source increment: +4 bytes per word
             external_dma_hw2reg_o.src_ptr_inc_d1.de = 1'b1;
-            external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h4;  // Increment by 4 bytes (32-bit word) in RAM
-            //Set destination increment: +4 bytes per word
             external_dma_hw2reg_o.dst_ptr_inc_d1.de = 1'b1;
-            external_dma_hw2reg_o.dst_ptr_inc_d1.d  = 'h4;  // Increment by 4 bytes (32-bit word) in RAM
-            //Set source data type: 32-bit word (See hw/ip/dma/data/dma.hjson for data type encoding)
-            external_dma_hw2reg_o.src_data_type.de = 1'b1;
-            external_dma_hw2reg_o.src_data_type.d = '0;  // 0 = 32-bit word
-            //Set destination data type: 32-bit word
-            external_dma_hw2reg_o.dst_data_type.de = 1'b1;
-            external_dma_hw2reg_o.dst_data_type.d = '0;  // 0 = 32-bit word
+            external_dma_hw2reg_o.src_data_type.de  = 1'b1;
+            external_dma_hw2reg_o.dst_data_type.de  = 1'b1;
+
+            if (memio_state_q == MEMIO_WRITE) begin
+              case (memio_be)
+                4'h1: begin
+                  // Byte 0 valid
+                  external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h0;  // No increment, single byte repeated for each word
+                  external_dma_hw2reg_o.dst_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.src_data_type.d = 'h3;  // 3 = 8-bit byte
+                  external_dma_hw2reg_o.dst_data_type.d = 'h3;  // 3 = 8-bit byte
+                end
+                4'h2: begin
+                  // Byte 1 valid
+                  external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h0;  // No increment, single byte repeated for each word
+                  external_dma_hw2reg_o.dst_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.src_data_type.d = 'h3;  // 3 = 8-bit byte
+                  external_dma_hw2reg_o.dst_data_type.d = 'h3;  // 3 = 8-bit byte
+                end
+                4'h3: begin
+                  // Byte 0 & 1 valid
+                  external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h0;  // No increment, single byte repeated for each word
+                  external_dma_hw2reg_o.dst_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.src_data_type.d = 'h1;  // 1 = 16-bit halfword
+                  external_dma_hw2reg_o.dst_data_type.d = 'h1;  // 1 = 16-bit halfword
+                end
+                4'h4: begin
+                  // Byte 2 valid
+                  external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h0;  // No increment, single byte repeated for each word
+                  external_dma_hw2reg_o.dst_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.src_data_type.d = 'h3;  // 3 = 8-bit byte
+                  external_dma_hw2reg_o.dst_data_type.d = 'h3;  // 3 = 8-bit byte
+                end
+                4'h8: begin
+                  // Byte 3 valid
+                  external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h0;  // No increment, single byte repeated for each word
+                  external_dma_hw2reg_o.dst_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.src_data_type.d = 'h3;  // 3 = 8-bit byte
+                  external_dma_hw2reg_o.dst_data_type.d = 'h3;  // 3 = 8-bit byte
+                end
+                4'hC: begin
+                  // Byte 2 & 3 valid
+                  external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h0;  // No increment, single byte repeated for each word
+                  external_dma_hw2reg_o.dst_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.src_data_type.d = 'h1;  // 1 = 16-bit halfword
+                  external_dma_hw2reg_o.dst_data_type.d = 'h1;  // 1 = 16-bit halfword
+                end
+                default: begin
+                  // All bytes valid
+                  external_dma_hw2reg_o.src_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.dst_ptr_inc_d1.d = 'h0;
+                  external_dma_hw2reg_o.src_data_type.d  = 'h0;  // 0 = 32-bit word
+                  external_dma_hw2reg_o.dst_data_type.d  = 'h0;  // 0 = 32-bit word
+                end
+              endcase
+
+            end else begin
+              //Set source increment: +4 bytes per word
+              external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h4;  // Increment by 4 bytes (32-bit word) in RAM
+              //Set destination increment: +4 bytes per word
+              external_dma_hw2reg_o.dst_ptr_inc_d1.d  = 'h4;  // Increment by 4 bytes (32-bit word) in RAM
+              //Set source data type: 32-bit word (See hw/ip/dma/data/dma.hjson for data type encoding)
+              external_dma_hw2reg_o.src_data_type.d = '0;  // 0 = 32-bit word
+              //Set destination data type: 32-bit word
+              external_dma_hw2reg_o.dst_data_type.d = '0;  // 0 = 32-bit word
+            end
             //Set DMA trigger slots (See sw/device/lib/drivers/dma/dma.h for trigger slot mapping)
             external_dma_hw2reg_o.slot.rx_trigger_slot.de = 1'b1;
             external_dma_hw2reg_o.slot.rx_trigger_slot.d = '0;
