@@ -1659,8 +1659,7 @@ module w25q128jw_controller
                            CACHE_DATA_ADDR,
                            32'h1, 32'h0,  // src_inc=1 (byte), dst_inc=0 (FIFO)
                            2'h2, 2'h0,  // src_data_type=8-bit, dst_data_type=32-bit
-                           'h4, 'h0,
-                           reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                           'h0, 'h0, 'h0,
                            {14'h0, head_bytes_q});
 `else
               set_dma_regs(reg2hw.md_address.q + md_offset_q,
@@ -1713,8 +1712,7 @@ module w25q128jw_controller
                            CACHE_DATA_ADDR,
                            32'h4, 32'h0,  // src_inc=4 (word), dst_inc=0 (FIFO)
                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                           'h4, 'h0,
-                           reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                           'h0, 'h0, 'h0,
                            dma_size_d[15:0]);
 `else
               set_dma_regs(reg2hw.md_address.q + md_offset_q,
@@ -1796,8 +1794,7 @@ module w25q128jw_controller
                            CACHE_DATA_ADDR,
                            32'h1, 32'h0,  // src_inc=1 (byte), dst_inc=0 (FIFO)
                            2'h2, 2'h0,  // src_data_type=8-bit, dst_data_type=32-bit
-                           'h4, 'h0,
-                           reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                           'h0, 'h0, 'h0,
                            {14'h0, tail_bytes_q});
 `else
               set_dma_regs(reg2hw.md_address.q + md_offset_q,
@@ -1822,7 +1819,7 @@ module w25q128jw_controller
 
 `ifdef CACHE_EN
               // Finish if cache enabled
-              top_state_d = TOP_IDLE;
+              top_state_d = TOP_DONE;
 `else
               // Proceed with WRITE FSM to program modified sector (page by page (page: 256 bytes)) back to flash
               modify_state_d = MODIFY_IDLE;
@@ -1989,7 +1986,7 @@ module w25q128jw_controller
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.opcode = CACHE_EVICT;
               cache_ctrl_req.addr.exposed =
-                { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q)[23:0]};
+                { 8'h0, victim_sector_offset_q, 12'h0};
               cache_ctrl_req.be = 4'hF;
             end
 
