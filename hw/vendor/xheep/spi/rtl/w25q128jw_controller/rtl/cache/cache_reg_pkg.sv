@@ -34,21 +34,21 @@ package cache_reg_pkg;
     } internal;
   } addr_t;
 
-  typedef enum logic [2:0] {
+  typedef enum logic [1:0] {
     CACHE_IDLE,
-    CACHE_READ,   // lookup + read word if hit
-    CACHE_WRITE,  // lookup + write word if hit
-    CACHE_FILL,   // stream word from DMA -> cache (when filling from FLASH)
-    CACHE_EVICT   // stream word from cache -> DMA (when flushing to FLASH)
+    CACHE_READ,   // stream word from cache -> DMA
+    CACHE_WRITE,  // stream word from DMA -> cache
+    CACHE_EVICT   // set sector as invalid within the cache
   } cache_op_e;
 
   // Cache request
   typedef struct packed {
-    logic                                 req;   // high on a new request, for 1 cycle
-    cache_op_e                            op;
-    addr_t                                addr;
-    logic [31:0]                          wdata; // data in case of a write
-    logic [3:0]                           be;    // byte-enable of wdata
+    logic                                 req;        // high on a new request
+    cache_op_e                            op;         // read or write
+    addr_t                                addr;       // address to read/write, byte-addressable
+    logic [SECTOR_SIZE_WORDS_WIDTH-1:0]   word_count; // number of words to read/write in current request
+    data_t                                wdata;      // data in case of a write
+    logic                                 dirty;      // (Write only) 1 if sector written is dirty, 0 if clean
   } cache_req_t;
 
   // Cache response

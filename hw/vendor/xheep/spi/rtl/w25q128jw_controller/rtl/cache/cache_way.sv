@@ -26,9 +26,11 @@ module cache_way
 
   logic [N_SETS_WIDTH-1:0]            current_set;
   logic [TAG_WIDTH-1:0]               current_tag;
+  logic                               hit;
 
   assign current_set = request_i.addr.internal.set;
   assign current_tag = request_i.addr.internal.tag;
+  assign hit         = valid_q[current_set] & (tags_q[current_set] == current_tag);
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -53,23 +55,17 @@ module cache_way
     if (request_i.req) begin
       unique case (request_i.op)
         CACHE_WRITE: begin
-          if (hit_o) begin
-            dirty_d[current_set] = 1'b1;
-          end
-        end
-
-        CACHE_FILL: begin
-          // Sector is now fully in cache (valid, not dirty)
+          // Sector is now fully in cache (valid), and may be dirty if it's a write
           if (last_sector_word_i) begin
             valid_d[current_set] = 1'b1;
-            dirty_d[current_set] = 1'b0;
+            dirty_d[current_set] = request_i.dirty;
             tags_d[current_set]  = current_tag;
           end
         end
 
         CACHE_EVICT: begin
-          // Sector is now fully evicted (not valid)
-          if (last_sector_word_i) begin
+          // Sector is evicted (not valid)
+          if (hit) begin
             valid_d[current_set] = 1'b0;
           end
         end
@@ -79,7 +75,7 @@ module cache_way
     end
   end
 
-  assign hit_o   = valid_q[current_set] & (tags_q[current_set] == current_tag);
+  assign hit_o   = hit;
   assign dirty_o = dirty_q[current_set];
   assign victim_sector_o = {tags_q[current_set], current_set};
 
