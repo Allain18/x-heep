@@ -22,6 +22,7 @@ module w25q128jw_controller
   import spi_host_reg_pkg::*;
   import cache_reg_pkg::*;
 #(
+    parameter bit  CACHE_EN  = 1'b1, // Set to 1 to enable cache, 0 to disable cache
     parameter type reg_req_t = reg_pkg::reg_req_t,
     parameter type reg_rsp_t = reg_pkg::reg_rsp_t
 ) (
@@ -329,9 +330,8 @@ module w25q128jw_controller
     RETURN_MODIFY,    // Return to MODIFY FSM (RAM new data -> RAM sector buffer transfer)
     RETURN_WRITE,     // Return to WRITE FSM (RAM sector buffer -> flash transfer)
 
-`ifdef CACHE_EN
+    // If cache enabled:
     RETURN_READ_CACHE // Return to CHECK_CACHE FSM (cache -> RAM sector buffer transfer)
-`endif
   } dma_init_return_e;
 
   // FSM signals
@@ -344,10 +344,10 @@ module w25q128jw_controller
   write_state_e write_state_q, write_state_d;
   dma_init_state_e dma_init_state_q, dma_init_state_d;
   dma_init_return_e dma_init_return_q, dma_init_return_d;
-`ifdef CACHE_EN
+
+  // If cache enabled
   check_cache_state_e check_cache_state_q, check_cache_state_d;
   read_cache_state_e read_cache_state_q, read_cache_state_d;
-`endif
 
   // Counter and Offset signals
   logic [3:0] page_cnt_q, page_cnt_d;
@@ -360,10 +360,8 @@ module w25q128jw_controller
   // boundary, we keep the number of bytes in the head and tail of the transfer
   logic [1:0] head_bytes_q, head_bytes_d, tail_bytes_q, tail_bytes_d;
 
-`ifdef CACHE_EN
-  // Keep in memory the victim's sector to writeback
+  // If cache enabled, keep in memory the victim's sector to writeback
   logic [11:0] victim_sector_offset_d, victim_sector_offset_q;
-`endif
 
   logic [31:0] dma_size_q, dma_size_d;
 
@@ -385,10 +383,11 @@ module w25q128jw_controller
       fwait_state_q <= FWAIT_IDLE;
       modify_state_q <= MODIFY_IDLE;
       write_state_q <= WRITE_IDLE;
-`ifdef CACHE_EN
-      check_cache_state_q <= CHECK_CACHE_IDLE;
-      read_cache_state_q <= READ_CACHE_IDLE;
-`endif
+
+      if (CACHE_EN) begin
+        check_cache_state_q <= CHECK_CACHE_IDLE;
+        read_cache_state_q <= READ_CACHE_IDLE;
+      end
 
       // -------- Reset: Clear counters and offsets --------
       fwait_return_q   <= FWAIT_RETURN_IDLE;
@@ -402,10 +401,11 @@ module w25q128jw_controller
       tail_bytes_q <= 2'h0;
       dma_size_q <= 32'h0;
 
-`ifdef CACHE_EN
-      victim_sector_offset_q <= 12'h0;
-`endif
+      if (CACHE_EN) begin
+        victim_sector_offset_q <= 12'h0;
+      end
     end else begin
+      // FSM signals
       dma_init_state_q <= dma_init_state_d;
       dma_init_return_q <= dma_init_return_d;
       top_state_q   <= top_state_d;
@@ -414,11 +414,13 @@ module w25q128jw_controller
       fwait_state_q <= fwait_state_d;
       modify_state_q <= modify_state_d;
       write_state_q <= write_state_d;
-`ifdef CACHE_EN
-      check_cache_state_q <= check_cache_state_d;
-      read_cache_state_q <= read_cache_state_d;
-`endif
 
+      if (CACHE_EN) begin
+        check_cache_state_q <= check_cache_state_d;
+        read_cache_state_q <= read_cache_state_d;
+      end
+
+      // Counters and offsets
       fwait_return_q <= fwait_return_d;
       page_cnt_q    <= page_cnt_d;
       sector_offset_q <= sector_offset_d;
@@ -430,9 +432,9 @@ module w25q128jw_controller
       tail_bytes_q <= tail_bytes_d;
       dma_size_q <= dma_size_d;
 
-`ifdef CACHE_EN
-      victim_sector_offset_q <= victim_sector_offset_d;
-`endif
+      if (CACHE_EN) begin
+        victim_sector_offset_q <= victim_sector_offset_d;
+      end
     end
   end
 
@@ -462,10 +464,10 @@ module w25q128jw_controller
     tail_bytes_d = tail_bytes_q;
     dma_size_d = dma_size_q;
 
-`ifdef CACHE_EN
-    cache_ctrl_req = '0;
-    victim_sector_offset_d = victim_sector_offset_q;
-`endif
+    if (CACHE_EN) begin
+      cache_ctrl_req = '0;
+      victim_sector_offset_d = victim_sector_offset_q;
+    end
 
     hw2reg.control.start.de = 1'b0;
     hw2reg.control.start.d = 1'b0;
@@ -504,13 +506,13 @@ module w25q128jw_controller
       // Wait for SW to set the START bit in CONTROL register
       TOP_IDLE: begin
         if (reg2hw.control.start.q) begin
-`ifdef CACHE_EN
-          // If cache enabled, first check if data is already in cache before deciding to read from flash or not
-          top_state_d = TOP_CHECK_CACHE;
-`else
-          // If no cache, always start with READ (for both read and write operations)
-          top_state_d = TOP_READ;
-`endif
+          if (CACHE_EN) begin
+            // If cache enabled, first check if data is already in cache before deciding to read from flash or not
+            top_state_d = TOP_CHECK_CACHE;
+          end else begin
+            // If no cache, always start with READ (for both read and write operations)
+            top_state_d = TOP_READ;
+          end
         end
       end
 
@@ -756,19 +758,20 @@ module w25q128jw_controller
         case (read_state_q)
           // -------- IDLE: Trigger DMA initialization --------
           READ_IDLE: begin
-`ifndef CACHE_EN
-            // If there is a sector, we always read an entire sector (no head/tail)
-            if (reg2hw.control.rnw.q) begin
-              // READ: Number of bytes to copy 1 by 1 before & after word-aligned transfer
-              head_bytes_d = 2'h0 - reg2hw.s_address.q[1:0];
-              if (reg2hw.length.q <= {30'h0, head_bytes_d}) begin
-                head_bytes_d = reg2hw.length.q[1:0];
-                tail_bytes_d = 2'h0;
-              end else begin
-                tail_bytes_d = reg2hw.s_address.q[1:0] + reg2hw.length.q[1:0];
+            if (!CACHE_EN) begin
+              // If there is a cache, we always read an entire sector (no head/tail)
+
+              if (reg2hw.control.rnw.q) begin
+                // READ: Number of bytes to copy 1 by 1 before & after word-aligned transfer
+                head_bytes_d = 2'h0 - reg2hw.s_address.q[1:0];
+                if (reg2hw.length.q <= {30'h0, head_bytes_d}) begin
+                  head_bytes_d = reg2hw.length.q[1:0];
+                  tail_bytes_d = 2'h0;
+                end else begin
+                  tail_bytes_d = reg2hw.s_address.q[1:0] + reg2hw.length.q[1:0];
+                end
               end
             end
-`endif
 
             // Reset md_offset for: all reads or first sector of a new write
             if (reg2hw.control.rnw.q || sector_iter_offset_q == 32'h0) begin
@@ -785,7 +788,7 @@ module w25q128jw_controller
           READ_SET_DMA: begin
             read_state_d = READ_SPI_CHECK_TX_FIFO;
 
-`ifdef CACHE_EN
+            if (CACHE_EN) begin
               // Always read an entire sector into the cache
               dma_size_d = {19'b0, SE_WSIZE};
 
@@ -797,58 +800,59 @@ module w25q128jw_controller
               cache_ctrl_req.be = 4'hF;
 
               set_dma_regs(SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET},
-                           CACHE_DATA_ADDR,
-                           32'h0, 32'h0,  // src_inc=0 (FIFO), dst_inc=0 (FIFO)
-                           2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                           'h4, 'h0,
-                           reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
-                           dma_size_d[15:0]);
-`else
-            if (reg2hw.control.rnw.q) begin
-              // READ: Set DMA for flash -> RAM transfer (head, body, or tail)
-              dma_size_d = (reg2hw.length.q - {30'h0, head_bytes_q}) >> 2;
-
-              if (head_bytes_q != 2'h0) begin
-                // HEAD: unaligned start address, byte-wise transfer until next word boundary
-                set_dma_regs(
-                    SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET}, reg2hw.s_address.q,
-                    32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=1 (SRAM)
-                    2'h0, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
-                    'h4, 'h0, reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
-                    {14'h0, head_bytes_q});
-              end else begin
-                if (dma_size_d != 0) begin
-                  // BODY: word-aligned transfer, 4 bytes at a time
-                  set_dma_regs(
-                      SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET}, reg2hw.s_address.q,
-                      32'h0, 32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
-                      2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                      'h4, 'h0,
-                      reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
-                      dma_size_d[15:0]);
-                end else begin
-                  // TAIL only
-                  set_dma_regs(
-                      SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET}, reg2hw.s_address.q,
-                      32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=1 (byte)
-                      2'h0, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
-                      'h4, 'h0,
-                      reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
-                      {14'h0, tail_bytes_q});
-                end
-              end
+                          CACHE_DATA_ADDR,
+                          32'h0, 32'h0,  // src_inc=0 (FIFO), dst_inc=0 (FIFO)
+                          2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
+                          'h4, 'h0,
+                          reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                          dma_size_d[15:0]);
             end else begin
-              // WRITE operation: always read one sector (1024 words = 4KB)
-              dma_size_d = {19'b0, SE_WSIZE};
+              // No cache
+              if (reg2hw.control.rnw.q) begin
+                // READ: Set DMA for flash -> RAM transfer (head, body, or tail)
+                dma_size_d = (reg2hw.length.q - {30'h0, head_bytes_q}) >> 2;
 
-              set_dma_regs(SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET},
-                           reg2hw.s_address.q, 32'h0, 32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
-                           2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                           'h4, 'h0,
-                           reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
-                           dma_size_d[15:0]);
+                if (head_bytes_q != 2'h0) begin
+                  // HEAD: unaligned start address, byte-wise transfer until next word boundary
+                  set_dma_regs(
+                      SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET}, reg2hw.s_address.q,
+                      32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=1 (SRAM)
+                      2'h0, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
+                      'h4, 'h0, reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                      {14'h0, head_bytes_q});
+                end else begin
+                  if (dma_size_d != 0) begin
+                    // BODY: word-aligned transfer, 4 bytes at a time
+                    set_dma_regs(
+                        SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET}, reg2hw.s_address.q,
+                        32'h0, 32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
+                        2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
+                        'h4, 'h0,
+                        reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                        dma_size_d[15:0]);
+                  end else begin
+                    // TAIL only
+                    set_dma_regs(
+                        SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET}, reg2hw.s_address.q,
+                        32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=1 (byte)
+                        2'h0, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
+                        'h4, 'h0,
+                        reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                        {14'h0, tail_bytes_q});
+                  end
+                end
+              end else begin
+                // WRITE operation: always read one sector (1024 words = 4KB)
+                dma_size_d = {19'b0, SE_WSIZE};
+
+                set_dma_regs(SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET},
+                            reg2hw.s_address.q, 32'h0, 32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
+                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
+                            'h4, 'h0,
+                            reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                            dma_size_d[15:0]);
+              end
             end
-`endif
           end
 
           // ============== SPI COMMAND SEQUENCE ==============
@@ -870,18 +874,16 @@ module w25q128jw_controller
             spi_host_reg_req_offset  = SPI_HOST_TXDATA_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-`ifdef CACHE_EN
-            // Use sector-aligned address + current sector iteration offset
-            flash_address = (reg2hw.f_address.q & 32'h00fff000) + (sector_iter_offset_q);
-`else
-            if (reg2hw.control.rnw.q) begin
+
+            if (CACHE_EN || !reg2hw.control.rnw.q) begin
+              // If cache enabled or WRITE
+              // Use sector-aligned address + current sector iteration offset
+              flash_address = (reg2hw.f_address.q & 32'h00fff000) + (sector_iter_offset_q);
+            end else begin
               // READ: Use exact flash address from F_ADDRESS register
               flash_address = reg2hw.f_address.q & 32'h00ffffff;
-            end else begin
-              // WRITE: Use sector-aligned address + current sector iteration offset
-              flash_address = (reg2hw.f_address.q & 32'h00fff000) + (sector_iter_offset_q);
             end
-`endif
+
             spi_host_reg_req_o.wdata = (((bitfield_byteswap32(flash_address)) >> 8) << 8) |
                 {19'h0, FC_RD};
 
@@ -932,56 +934,55 @@ module w25q128jw_controller
             spi_host_reg_req_offset  = SPI_HOST_COMMAND_OFFSET;
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
-`ifdef CACHE_EN
-            // If cache enabled, always read a full sector (4096 bytes)
-            spi_host_reg_req_o.wdata =
-                spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, {11'b0, SE_BSIZE - 1'h1});
-`else
-            if (reg2hw.control.rnw.q) begin
-              // READ: receive user-specified number of bytes
-              if (head_bytes_q != 0) begin
-                // If we have a head (unaligned start)
-                spi_host_reg_req_o.wdata = spi_cmd_pack(
-                  SPI_DIR_RX,
-                  SPI_SPEED_STD,
-                  (dma_size_q != 0 || tail_bytes_q != 0),  // Expect another command if body or tail
-                  ({22'h0, head_bytes_q} - 1'h1)
-                );
-              end else if (dma_size_q != 0) begin
-                // If we have a body (word-aligned transfer)
-                spi_host_reg_req_o.wdata = spi_cmd_pack(
-                  SPI_DIR_RX,
-                  SPI_SPEED_STD,
-                  (tail_bytes_q != 0),  // Expect another command if tail
-                  ((dma_size_q << 2) - 1'h1)
-                );
-              end else begin
-                // Tail only
-                spi_host_reg_req_o.wdata =
-                    spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, ({22'h0, tail_bytes_q} - 1'h1));
-              end
-            end else begin
-              // WRITE: read full sector (4096 bytes)
+
+            if (CACHE_EN) begin
+              // If cache enabled, always read a full sector (4096 bytes)
               spi_host_reg_req_o.wdata =
                   spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, {11'b0, SE_BSIZE - 1'h1});
+            end else begin
+              // If no cache, either READ: read bytes or WRITE: read a full sector
+              if (reg2hw.control.rnw.q) begin
+                // READ: receive user-specified number of bytes
+                if (head_bytes_q != 0) begin
+                  // If we have a head (unaligned start)
+                  spi_host_reg_req_o.wdata = spi_cmd_pack(
+                    SPI_DIR_RX,
+                    SPI_SPEED_STD,
+                    (dma_size_q != 0 || tail_bytes_q != 0),  // Expect another command if body or tail
+                    ({22'h0, head_bytes_q} - 1'h1)
+                  );
+                end else if (dma_size_q != 0) begin
+                  // If we have a body (word-aligned transfer)
+                  spi_host_reg_req_o.wdata = spi_cmd_pack(
+                    SPI_DIR_RX,
+                    SPI_SPEED_STD,
+                    (tail_bytes_q != 0),  // Expect another command if tail
+                    ((dma_size_q << 2) - 1'h1)
+                  );
+                end else begin
+                  // Tail only
+                  spi_host_reg_req_o.wdata =
+                      spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, ({22'h0, tail_bytes_q} - 1'h1));
+                end
+              end else begin
+                // WRITE: read full sector (4096 bytes)
+                spi_host_reg_req_o.wdata =
+                    spi_cmd_pack(SPI_DIR_RX, SPI_SPEED_STD, 1'b0, {11'b0, SE_BSIZE - 1'h1});
+              end
             end
-`endif
 
             if (spi_host_reg_rsp_i.ready && ~spi_host_reg_rsp_i.error) begin
-`ifdef CACHE_EN
-              // If cache enabled, full sector DMA
-              read_state_d = READ_SECTOR_TRANS;
-`else
-              if (!reg2hw.control.rnw.q) begin
-                read_state_d = READ_SECTOR_TRANS;  // Write path: full sector DMA
+              if (CACHE_EN || !reg2hw.control.rnw.q) begin
+                // If cache enabled or WRITE, full sector DMA
+                read_state_d = READ_SECTOR_TRANS;
               end else if (head_bytes_q != 0) begin
                 read_state_d = READ_HEAD_TRANS;
               end else if ((reg2hw.length.q >> 2) != 0) begin
                 read_state_d = READ_BODY_TRANS;
               end else begin
                 read_state_d = READ_TAIL_TRANS;
+                end
               end
-`endif
             end
           end
 
@@ -1130,15 +1131,15 @@ module w25q128jw_controller
             if (dma_done_i[0]) begin  // DMA channel 0 done signal
               read_state_d  = READ_IDLE;
 
-`ifdef CACHE_EN
-              // Cache filled, proceed to CHECK_CACHE (hit)
-              top_state_d         = TOP_CHECK_CACHE;
-              check_cache_state_d = CHECK_CACHE_HIT;
-`else
-              // ===== WRITE OPERATION: Proceed to FWAIT =====
-              top_state_d   = TOP_FWAIT;
-              fwait_state_d = FWAIT_IDLE;
-`endif
+              if (CACHE_EN) begin
+                // ===== CACHE FILLED, proceed to CHECK_CACHE (hit) =====
+                top_state_d         = TOP_CHECK_CACHE;
+                check_cache_state_d = CHECK_CACHE_HIT;
+              end else begin
+                // ===== WRITE OPERATION: Proceed to FWAIT =====
+                top_state_d   = TOP_FWAIT;
+                fwait_state_d = FWAIT_IDLE;
+              end
             end
           end
 
@@ -1405,27 +1406,27 @@ module w25q128jw_controller
                 case (fwait_return_q)
 
                   FWAIT_RETURN_IDLE: begin
-`ifdef CACHE_EN
-                    // If cache enabled, after READ: Flash ready -> go to CHECK CACHE (is a hit)
-                    top_state_d = TOP_CHECK_CACHE;
-                    check_cache_state_d = CHECK_CACHE_HIT;
-`else
-                    // Otherwise: Flash ready -> go to ERASE (if write operation)
-                    fwait_return_d = FWAIT_RETURN_ERASE;
-                    top_state_d = TOP_ERASE;
-`endif
+                    if (CACHE_EN) begin
+                      // If cache enabled, after READ: Flash ready -> go to CHECK CACHE (is a hit)
+                      top_state_d = TOP_CHECK_CACHE;
+                      check_cache_state_d = CHECK_CACHE_HIT;
+                    end else begin
+                      // Otherwise: Flash ready -> go to ERASE (if write operation)
+                      fwait_return_d = FWAIT_RETURN_ERASE;
+                      top_state_d = TOP_ERASE;
+                    end
                   end
 
                   FWAIT_RETURN_ERASE: begin
-`ifdef CACHE_EN
-                    // After ERASE: Flash ready -> go to WRITE (writeback modified sector from cache to flash)
-                    fwait_return_d = FWAIT_RETURN_WRITE;
-                    top_state_d = TOP_WRITE;
-`else
-                    // After ERASE: Flash ready -> go to MODIFY
-                    fwait_return_d = FWAIT_RETURN_MODIFY;
-                    top_state_d = TOP_MODIFY;
-`endif
+                    if (CACHE_EN) begin
+                      // After ERASE: Flash ready -> go to WRITE (writeback modified sector from cache to flash)
+                      fwait_return_d = FWAIT_RETURN_WRITE;
+                      top_state_d = TOP_WRITE;
+                    end else begin
+                      // After ERASE: Flash ready -> go to MODIFY
+                      fwait_return_d = FWAIT_RETURN_MODIFY;
+                      top_state_d = TOP_MODIFY;
+                    end
                   end
 
                   // If WRITE has multiple pages to modify, continue with next page
@@ -1439,14 +1440,14 @@ module w25q128jw_controller
                       // All sectors done
                       top_state_d         = TOP_DONE;
                     end else begin
-`ifdef CACHE_EN
-                      // Victim cache line is now clean, can now load requested cache line
-                      check_cache_state_d = CHECK_CACHE_MISS_CLEAN;
-                      top_state_d         = TOP_CHECK_CACHE;
-`else
-                      // More sectors to write
-                      top_state_d         = TOP_READ;
-`endif
+                      if (CACHE_EN) begin
+                        // Victim cache line is now clean, can now load requested cache line
+                        check_cache_state_d = CHECK_CACHE_MISS_CLEAN;
+                        top_state_d         = TOP_CHECK_CACHE;
+                      end else begin
+                        // More sectors to write
+                        top_state_d         = TOP_READ;
+                      end
                     end
                   end
 
@@ -1554,13 +1555,13 @@ module w25q128jw_controller
             // Use sector-aligned address + current sector iteration offset + SECTOR ERASE command
             // Inspiration from sw/device/bsp/w25q
 
-`ifdef CACHE_EN
-            // Erase victim sector if cache enabled
-            flash_address = {8'h0, victim_sector_offset_q, 12'h0};
-`else
-            // If no cache, write-back directly the result at the correct address
-            flash_address = (reg2hw.f_address.q & 32'h00fff000) + (sector_iter_offset_q);
-`endif
+            if (CACHE_EN) begin
+              // If cache enabled, erase victim sector
+              flash_address = {8'h0, victim_sector_offset_q, 12'h0};
+            end else begin
+              // If no cache, write-back directly the result at the correct address
+              flash_address = (reg2hw.f_address.q & 32'h00fff000) + (sector_iter_offset_q);
+            end
 
             spi_host_reg_req_o.wdata = ((bitfield_byteswap32(flash_address) >> 8) << 8) |
                 {19'h0, FC_SE};
@@ -1661,29 +1662,29 @@ module w25q128jw_controller
             if (head_bytes_q != 0) begin
               modify_state_d = MODIFY_HEAD_TRANS;
 
-`ifdef CACHE_EN
-              // Cache request: modify line from SRAM to cache (will set line as dirty)
-              cache_ctrl_req.req = 1'b1;
-              cache_ctrl_req.opcode = CACHE_WRITE;
-              cache_ctrl_req.addr.exposed =
-                { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
-              cache_ctrl_req.word_count = 1;  // Always 1 word for head (up to 3 bytes)
-              cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
-              cache_ctrl_req.be = (1 << head_bytes_q) - 1;
+              if (CACHE_EN) begin
+                // Cache request: modify line from SRAM to cache (will set line as dirty)
+                cache_ctrl_req.req = 1'b1;
+                cache_ctrl_req.opcode = CACHE_WRITE;
+                cache_ctrl_req.addr.exposed =
+                  { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
+                cache_ctrl_req.word_count = 1;  // Always 1 word for head (up to 3 bytes)
+                cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
+                cache_ctrl_req.be = (1 << head_bytes_q) - 1;
 
-              set_dma_regs(reg2hw.md_address.q + md_offset_q,
-                           CACHE_DATA_ADDR,
-                           32'h1, 32'h0,  // src_inc=1 (byte), dst_inc=0 (FIFO)
-                           2'h2, 2'h0,  // src_data_type=8-bit, dst_data_type=32-bit
-                           'h0, 'h0, 'h0,
-                           {14'h0, head_bytes_q});
-`else
-              set_dma_regs(reg2hw.md_address.q + md_offset_q,
-                           reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h1,
-                           32'h1,  // 1-byte transfer
-                           2'h2, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
-                           'h0, 'h0, 'h0, {14'h0, head_bytes_q});
-`endif
+                set_dma_regs(reg2hw.md_address.q + md_offset_q,
+                            CACHE_DATA_ADDR,
+                            32'h1, 32'h0,  // src_inc=1 (byte), dst_inc=0 (FIFO)
+                            2'h2, 2'h0,  // src_data_type=8-bit, dst_data_type=32-bit
+                            'h0, 'h0, 'h0,
+                            {14'h0, head_bytes_q});
+              end else begin
+                set_dma_regs(reg2hw.md_address.q + md_offset_q,
+                            reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h1,
+                            32'h1,  // 1-byte transfer
+                            2'h2, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
+                            'h0, 'h0, 'h0, {14'h0, head_bytes_q});
+              end
             end else begin
               // No head to transfer, go directly to body
               modify_state_d = MODIFY_BODY_REGS;
@@ -1716,29 +1717,29 @@ module w25q128jw_controller
             end
 
             if (dma_size_d != 0) begin
-`ifdef CACHE_EN
-              // Cache request: modify line from SRAM to cache (will set line as dirty)
-              cache_ctrl_req.req = 1'b1;
-              cache_ctrl_req.opcode = CACHE_WRITE;
-              cache_ctrl_req.addr.exposed =
-                { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
-              cache_ctrl_req.word_count = dma_size_d[15:0];
-              cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
-              cache_ctrl_req.be = 4'hF;
+              if (CACHE_EN) begin
+                // Cache request: modify line from SRAM to cache (will set line as dirty)
+                cache_ctrl_req.req = 1'b1;
+                cache_ctrl_req.opcode = CACHE_WRITE;
+                cache_ctrl_req.addr.exposed =
+                  { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
+                cache_ctrl_req.word_count = dma_size_d[15:0];
+                cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
+                cache_ctrl_req.be = 4'hF;
 
-              set_dma_regs(reg2hw.md_address.q + md_offset_q,
-                           CACHE_DATA_ADDR,
-                           32'h4, 32'h0,  // src_inc=4 (word), dst_inc=0 (FIFO)
-                           2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                           'h0, 'h0, 'h0,
-                           dma_size_d[15:0]);
-`else
-              set_dma_regs(reg2hw.md_address.q + md_offset_q,
-                           reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h4,
-                           32'h4,  // 4-byte increment for word transfers
-                           2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                           'h0, 'h0, 'h0, dma_size_d[15:0]);
-`endif
+                set_dma_regs(reg2hw.md_address.q + md_offset_q,
+                            CACHE_DATA_ADDR,
+                            32'h4, 32'h0,  // src_inc=4 (word), dst_inc=0 (FIFO)
+                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
+                            'h0, 'h0, 'h0,
+                            dma_size_d[15:0]);
+              end else begin
+                set_dma_regs(reg2hw.md_address.q + md_offset_q,
+                            reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h4,
+                            32'h4,  // 4-byte increment for word transfers
+                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
+                            'h0, 'h0, 'h0, dma_size_d[15:0]);
+              end
 
               modify_state_d = MODIFY_BODY_TRANS;
             end else begin
@@ -1777,52 +1778,53 @@ module w25q128jw_controller
                 hw2reg.length.d = 32'h0;
                 md_offset_d = 32'h0;
 
-`ifdef CACHE_EN
-                // Finish if cache enabled
-                top_state_d = TOP_DONE;
-`endif
+                if (CACHE_EN) begin
+                  // Finish if cache enabled
+                  top_state_d = TOP_DONE;
+                end
               end else begin
                 // More data remains: compute remaining length for next sector iteration
                 hw2reg.length.d = reg2hw.length.q - {19'h0, sector_written_bytes_q};
 
-`ifdef CACHE_EN
-                // Start again with next sector if cache enabled
-                top_state_d = TOP_CHECK_CACHE;
-                check_cache_state_d = CHECK_CACHE_IDLE;
-`endif
+                if (CACHE_EN) begin
+                  // Start again with next sector if cache enabled
+                  top_state_d = TOP_CHECK_CACHE;
+                  check_cache_state_d = CHECK_CACHE_IDLE;
+                end
               end
 
-`ifndef CACHE_EN
-              // Proceed with WRITE FSM to program modified sector (page by page (page: 256 bytes)) back to flash
-              modify_state_d = MODIFY_IDLE;
-              top_state_d    = TOP_WRITE;
-              write_state_d  = WRITE_IDLE;
-`endif
+              if (!CACHE_EN) begin
+                // Proceed with WRITE FSM to program modified sector (page by page (page: 256 bytes)) back to flash
+                modify_state_d = MODIFY_IDLE;
+                top_state_d    = TOP_WRITE;
+                write_state_d  = WRITE_IDLE;
+              end
             end else begin
               // Tail to transfer remains, configure DMA for tail
-`ifdef CACHE_EN
-              // Cache request: modify line from SRAM to cache (will set line as dirty)
-              cache_ctrl_req.req = 1'b1;
-              cache_ctrl_req.opcode = CACHE_WRITE;
-              cache_ctrl_req.addr.exposed =
-                { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
-              cache_ctrl_req.word_count = 1;  // Always 1 word for tail (up to 3 bytes)
-              cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
-              cache_ctrl_req.be = (1 << tail_bytes_q) - 1;
+              if (CACHE_EN) begin
+                // Cache request: modify line from SRAM to cache (will set line as dirty)
+                cache_ctrl_req.req = 1'b1;
+                cache_ctrl_req.opcode = CACHE_WRITE;
+                cache_ctrl_req.addr.exposed =
+                  { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
+                cache_ctrl_req.word_count = 1;  // Always 1 word for tail (up to 3 bytes)
+                cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
+                cache_ctrl_req.be = (1 << tail_bytes_q) - 1;
 
-              set_dma_regs(reg2hw.md_address.q + md_offset_q,
-                           CACHE_DATA_ADDR,
-                           32'h1, 32'h0,  // src_inc=1 (byte), dst_inc=0 (FIFO)
-                           2'h2, 2'h0,  // src_data_type=8-bit, dst_data_type=32-bit
-                           'h0, 'h0, 'h0,
-                           {14'h0, tail_bytes_q});
-`else
-              set_dma_regs(reg2hw.md_address.q + md_offset_q,
-                           reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h1,
-                           32'h1,  // 1-byte transfer
-                           2'h2, 2'h2,  // src_data_type=32-bit (MD), dst_data_type=8-bit (SRAM)
-                           'h0, 'h0, 'h0, tail_bytes_q);
-`endif
+                set_dma_regs(reg2hw.md_address.q + md_offset_q,
+                            CACHE_DATA_ADDR,
+                            32'h1, 32'h0,  // src_inc=1 (byte), dst_inc=0 (FIFO)
+                            2'h2, 2'h0,  // src_data_type=8-bit, dst_data_type=32-bit
+                            'h0, 'h0, 'h0,
+                            {14'h0, tail_bytes_q});
+              end else begin
+                // No cache
+                set_dma_regs(reg2hw.md_address.q + md_offset_q,
+                            reg2hw.s_address.q + {20'h0, sector_offset_q}, 32'h1,
+                            32'h1,  // 1-byte transfer
+                            2'h2, 2'h2,  // src_data_type=32-bit (MD), dst_data_type=8-bit (SRAM)
+                            'h0, 'h0, 'h0, tail_bytes_q);
+              end
 
               modify_state_d = MODIFY_TAIL_TRANS;
             end
@@ -1837,15 +1839,15 @@ module w25q128jw_controller
               hw2reg.length.de = 1'b1;
               hw2reg.length.d  = 32'h0;
 
-`ifdef CACHE_EN
-              // Finish if cache enabled
-              top_state_d = TOP_DONE;
-`else
-              // Proceed with WRITE FSM to program modified sector (page by page (page: 256 bytes)) back to flash
-              modify_state_d = MODIFY_IDLE;
-              top_state_d    = TOP_WRITE;
-              write_state_d  = WRITE_IDLE;
-`endif
+              if (CACHE_EN) begin
+                // Finish if cache enabled
+                top_state_d = TOP_DONE;
+              end else begin
+                // Proceed with WRITE FSM to program modified sector (page by page (page: 256 bytes)) back to flash
+                modify_state_d = MODIFY_IDLE;
+                top_state_d    = TOP_WRITE;
+                write_state_d  = WRITE_IDLE;
+              end
             end
           end
 
@@ -1941,14 +1943,14 @@ module w25q128jw_controller
             spi_host_reg_req_o.write = 1'b1;
             spi_host_reg_req_o.valid = 1'b1;
 
-`ifdef CACHE_EN
-            // If cache enabled, write-back the victim sector + page offset
-            flash_address = {8'h0, victim_sector_offset_q, page_cnt_q, 8'h0};
-`else
-            // Compute page address: sector base + sector offset + page offset
-            flash_address = ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q) |
-                  ({28'h0, page_cnt_q} << 8);
-`endif
+            if (CACHE_EN) begin
+              // If cache enabled, write-back the victim sector + page offset
+              flash_address = {8'h0, victim_sector_offset_q, page_cnt_q, 8'h0};
+            end else begin
+              // Compute page address: sector base + sector offset + page offset
+              flash_address = ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q) |
+                    ({28'h0, page_cnt_q} << 8);
+            end
 
             if (reg2hw.control.quad.q) begin
               spi_host_reg_req_o.wdata = (bitfield_byteswap32(flash_address) & 32'hffffff00) |
@@ -1999,32 +2001,32 @@ module w25q128jw_controller
           WRITE_DMA_REGS: begin
             write_state_d = WRITE_TRANS;
 
-`ifdef CACHE_EN
-            // Cache request: send line from cache to FLASH (writeback)
-            if (page_cnt_q == 4'h0) begin
-              // Make cache request for whole sector in the first page
-              cache_ctrl_req.req = 1'b1;
-              cache_ctrl_req.opcode = CACHE_READ;
-              cache_ctrl_req.addr.exposed =
-                { 8'h0, victim_sector_offset_q, 12'h0};
-              cache_ctrl_req.word_count = PAGE_WSIZE;  // Always 1 page (256 bytes) for each PP command
-              cache_ctrl_req.be = 4'hF;
-            end
+            if (CACHE_EN) begin
+              // Cache request: send line from cache to FLASH (writeback)
+              if (page_cnt_q == 4'h0) begin
+                // Make cache request for whole sector in the first page
+                cache_ctrl_req.req = 1'b1;
+                cache_ctrl_req.opcode = CACHE_READ;
+                cache_ctrl_req.addr.exposed =
+                  { 8'h0, victim_sector_offset_q, 12'h0};
+                cache_ctrl_req.word_count = PAGE_WSIZE;  // Always 1 page (256 bytes) for each PP command
+                cache_ctrl_req.be = 4'hF;
+              end
 
-            set_dma_regs(CACHE_DATA_ADDR,
-                          SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_TXDATA_OFFSET},
-                          32'h0, 32'h0,  // src_inc=0 (FIFO), dst_inc=0 (FIFO)
+              set_dma_regs(CACHE_DATA_ADDR,
+                            SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_TXDATA_OFFSET},
+                            32'h0, 32'h0,  // src_inc=0 (FIFO), dst_inc=0 (FIFO)
+                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
+                            'h0, 'h8, reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter
+                            {3'h0, PAGE_WSIZE});
+            end else begin
+              set_dma_regs(reg2hw.s_address.q + ({28'h0, page_cnt_q} << 8),
+                          SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_TXDATA_OFFSET}, 32'h4,
+                          32'h0,  // src_inc=4 (word), dst_inc=0 (FIFO)
                           2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
                           'h0, 'h8, reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter
                           {3'h0, PAGE_WSIZE});
-`else
-            set_dma_regs(reg2hw.s_address.q + ({28'h0, page_cnt_q} << 8),
-                         SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_TXDATA_OFFSET}, 32'h4,
-                         32'h0,  // src_inc=4 (word), dst_inc=0 (FIFO)
-                         2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                         'h0, 'h8, reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter
-                         {3'h0, PAGE_WSIZE});
-`endif
+            end
           end
 
           // ============== WAIT FOR DMA COMPLETION ==============
@@ -2074,13 +2076,13 @@ module w25q128jw_controller
                   sector_iter_offset_d = sector_iter_offset_q + {19'b0, SE_BSIZE}; // Next sector (+4KB)
                 end
 
-`ifdef CACHE_EN
-                // If cache enabled, we are evicting the sector from cache
-                cache_ctrl_req.req = 1'b1;
-                cache_ctrl_req.opcode = CACHE_EVICT;
-                cache_ctrl_req.addr.exposed =
-                  { 8'h0, victim_sector_offset_q, 12'h0};
-`endif
+                if (CACHE_EN) begin
+                  // If cache enabled, we are evicting the sector from cache
+                  cache_ctrl_req.req = 1'b1;
+                  cache_ctrl_req.opcode = CACHE_EVICT;
+                  cache_ctrl_req.addr.exposed =
+                    { 8'h0, victim_sector_offset_q, 12'h0};
+                end
 
               end else begin
                 // ===== MORE PAGES IN CURRENT SECTOR: Program next page =====
@@ -2197,11 +2199,12 @@ module w25q128jw_controller
               RETURN_WRITE: begin
                 top_state_d = TOP_WRITE;  // Continue with flash page programming
               end
-`ifdef CACHE_EN
+
+              // Only reachable if cache enabled
               RETURN_READ_CACHE: begin
                 top_state_d = TOP_READ_CACHE;  // Continue with flash read operation with cache
               end
-`endif
+
               default: begin
                 top_state_d = TOP_IDLE;
               end
