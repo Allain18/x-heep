@@ -2014,7 +2014,7 @@ module w25q128jw_controller
                 cache_ctrl_req.op = CACHE_READ;
                 cache_ctrl_req.addr.exposed =
                   { 8'h0, victim_sector_offset_q, 12'h0};
-                cache_ctrl_req.word_count = PAGE_WSIZE;  // Always 1 page (256 bytes) for each PP command
+                cache_ctrl_req.word_count = SE_WSIZE;
                 cache_ctrl_req.be = 4'hF;
               end
 
@@ -2077,9 +2077,6 @@ module w25q128jw_controller
                 // Always wait until flash is not busy before finalizing or moving to next sector.
                 fwait_return_d = FWAIT_RETURN_SECTOR_DONE;
                 page_cnt_d = 4'b0;  // Reset page counter for next sector / next operation
-                if (reg2hw.length.q != 0) begin
-                  sector_iter_offset_d = sector_iter_offset_q + {19'b0, SE_BSIZE}; // Next sector (+4KB)
-                end
 
                 if (CACHE_EN) begin
                   // If cache enabled, we are evicting the sector from cache
@@ -2087,6 +2084,9 @@ module w25q128jw_controller
                   cache_ctrl_req.op = CACHE_EVICT;
                   cache_ctrl_req.addr.exposed =
                     { victim_sector_offset_q, 12'h0};
+                end else if (reg2hw.length.q != 0) begin
+                  // If no cache and more sectors to process, move to next sector
+                  sector_iter_offset_d = sector_iter_offset_q + {19'b0, SE_BSIZE}; // Next sector (+4KB)
                 end
 
               end else begin
