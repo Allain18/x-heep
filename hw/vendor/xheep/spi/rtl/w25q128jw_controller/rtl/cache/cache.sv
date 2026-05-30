@@ -33,7 +33,8 @@ module cache
   // Sector address registered at start of READ/WRITE
   logic [N_SETS_WIDTH-1:0]            target_set_q, target_set_d;
   logic [TAG_WIDTH-1:0]               target_tag_q, target_tag_d;
-  logic [SECTOR_SIZE_WORDS_WIDTH-1:0] target_word_len_q, target_word_len_d;
+  logic [SECTOR_SIZE_WORDS_WIDTH-1:0] target_start_q, target_start_d; // Word offset of the first word of the transfer
+  logic [SECTOR_SIZE_WORDS_WIDTH-1:0] target_word_len_q, target_word_len_d; // Number of words to transfer
 
   // Cache way(s) signals
   logic                               hit;
@@ -59,12 +60,14 @@ module cache
       word_counter_q    <= '0;
       target_set_q      <= '0;
       target_tag_q      <= '0;
+      target_start_q    <= '0;
       target_word_len_q <= '0;
     end else begin
       active_op_q       <= active_op_d;
       word_counter_q    <= word_counter_d;
       target_set_q      <= target_set_d;
       target_tag_q      <= target_tag_d;
+      target_start_q    <= target_start_d;
       target_word_len_q <= target_word_len_d;
     end
   end
@@ -74,9 +77,10 @@ module cache
     word_counter_d    = word_counter_q;
     target_set_d      = target_set_q;
     target_tag_d      = target_tag_q;
+    target_start_d    = target_start_q;
     target_word_len_d = target_word_len_q;
 
-    last_sector_word  = (word_counter_q == (target_word_len_q - 1'b1));
+    last_sector_word  = (word_counter_q == (target_start_q + target_word_len_q - 1'b1));
 
     if (controller_req_i.req) begin
       active_op_d       = controller_req_i.op;
@@ -85,7 +89,8 @@ module cache
       target_word_len_d = controller_req_i.word_count;
 
       // Start at requested word offset within sector
-      word_counter_d = controller_req_i.addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
+      target_start_d    = controller_req_i.addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
+      word_counter_d    = controller_req_i.addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
     end else begin
       unique case (active_op_q)
         CACHE_READ, CACHE_WRITE: begin
@@ -184,7 +189,7 @@ module cache
   // Output assignments
 
   // DMA response
-  assign dma_resp_o.gnt    = gnt;
+  assign dma_resp_o.gnt    = gnt; // TODO: may need to add DONE signal, to avoid overlapping transactions
   assign dma_resp_o.rvalid = rvalid[SramLatency-1];
   assign dma_resp_o.rdata  = mem_rdata;
 
