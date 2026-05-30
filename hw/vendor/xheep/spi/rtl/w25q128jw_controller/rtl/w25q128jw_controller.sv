@@ -2266,17 +2266,25 @@ module w25q128jw_controller
         cache_dma_req.req   = 1'b1;
         cache_dma_req.we    = 1'b0;
       end
+    end else begin
+      cache_data_bus_we = 1'b0;
+      cache_data_bus_re = 1'b0;
+      cache_dma_req = '0;
     end
   end
 
-  cache cache_i (
-    .clk_i             (clk_i),
-    .rst_ni            (rst_ni),
-    .dma_req_i         (cache_dma_req),
-    .dma_resp_o        (cache_dma_resp),
-    .controller_req_i  (cache_ctrl_req),
-    .controller_resp_o (cache_ctrl_resp)
-  );
+  generate
+    if (CACHE_EN) begin : gen_cache
+      cache cache_i (
+        .clk_i             (clk_i),
+        .rst_ni            (rst_ni),
+        .dma_req_i         (cache_dma_req),
+        .dma_resp_o        (cache_dma_resp),
+        .controller_req_i  (cache_ctrl_req),
+        .controller_resp_o (cache_ctrl_resp)
+      );
+    end
+  endgenerate
 
   // Registers
   w25q128jw_controller_reg_top #(
