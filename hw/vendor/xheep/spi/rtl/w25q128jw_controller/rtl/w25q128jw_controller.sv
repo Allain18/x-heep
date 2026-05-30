@@ -240,9 +240,10 @@ module w25q128jw_controller
   // Reset wait status and redirect to correct FSM after flash is ready
   // depending on which operation we were waiting for
   // Note: only used for WRITE operation
-  typedef enum logic [1:0] {
+  typedef enum logic [2:0] {
     FWAIT_RETURN_IDLE, // After READ: -> ERASE
     FWAIT_RETURN_ERASE, // After ERASE: -> MODIFY
+    FWAIT_RETURN_MODIFY, // After ERASE (no cache): -> MODIFY
     FWAIT_RETURN_WRITE, // After page < 15: -> WRITE (next page)
     FWAIT_RETURN_SECTOR_DONE // After page 15: check if more sectors to write
   } fwait_return_e;
@@ -369,6 +370,9 @@ module w25q128jw_controller
   // Cache signals
   cache_reg_pkg::cache_req_t cache_ctrl_req;
   cache_reg_pkg::cache_res_t cache_ctrl_resp;
+  obi_pkg::obi_req_t         cache_dma_req;
+  obi_pkg::obi_resp_t        cache_dma_resp; 
+  logic cache_data_bus_we, cache_data_bus_re;
 
   // FSM sequential logic
   always_ff @(posedge clk_i or negedge rst_ni) begin
@@ -533,13 +537,13 @@ module w25q128jw_controller
         case (check_cache_state_q)
           // -------- IDLE: Trigger Cache request --------
           CHECK_CACHE_IDLE: begin
-            cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + sector_iter_offset_q)[23:0]};
+            cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + sector_iter_offset_q) & 32'h00ffffff};
             check_cache_state_d = CHECK_CACHE_RESPONSE;
           end
 
           // -------- RESPONSE: Evaluate Cache response --------
           CHECK_CACHE_RESPONSE: begin
-            cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + sector_iter_offset_q)[23:0]};
+            cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + sector_iter_offset_q) & 32'h00ffffff};
 
             if (cache_ctrl_resp.hit) begin
               check_cache_state_d = CHECK_CACHE_HIT;
@@ -620,7 +624,7 @@ module w25q128jw_controller
               // Cache request
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op = CACHE_READ;
-              cache_ctrl_req.addr.exposed = {8'h0, reg2hw.f_address.q[23:0]} + md_offset_q;
+              cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + md_offset_q) & 32'h00ffffff};
               cache_ctrl_req.word_count = 1;  // Always read a word for head
 
               set_dma_regs(CACHE_DATA_ADDR,
@@ -666,7 +670,7 @@ module w25q128jw_controller
               // Cache request
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op = CACHE_READ;
-              cache_ctrl_req.addr.exposed = {8'h0, reg2hw.f_address.q[23:0]} + md_offset_q;
+              cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + md_offset_q) & 32'h00ffffff};
               cache_ctrl_req.word_count = dma_size_d[15:0];
 
               set_dma_regs(CACHE_DATA_ADDR,
@@ -719,7 +723,7 @@ module w25q128jw_controller
               // Cache request
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op = CACHE_READ;
-              cache_ctrl_req.addr.exposed = {8'h0, reg2hw.f_address.q[23:0]} + md_offset_q;
+              cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + md_offset_q) & 32'h00ffffff};
               cache_ctrl_req.word_count = 1;  // Always read a word for tail
 
               set_dma_regs(CACHE_DATA_ADDR,
@@ -798,7 +802,7 @@ module w25q128jw_controller
               // Set the cache to fill the data
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op  = CACHE_WRITE;
-              cache_ctrl_req.addr.exposed = {8'h0, ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q)[23:0]};
+              cache_ctrl_req.addr.exposed = {8'h0, ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q) & 32'h00ffffff};
               cache_ctrl_req.word_count = dma_size_d[15:0];
               cache_ctrl_req.dirty = 1'b0;
               cache_ctrl_req.be = 4'hF;
@@ -985,7 +989,6 @@ module w25q128jw_controller
                 read_state_d = READ_BODY_TRANS;
               end else begin
                 read_state_d = READ_TAIL_TRANS;
-                end
               end
             end
           end
@@ -1670,8 +1673,7 @@ module w25q128jw_controller
                 // Cache request: modify line from SRAM to cache (will set line as dirty)
                 cache_ctrl_req.req = 1'b1;
                 cache_ctrl_req.op = CACHE_WRITE;
-                cache_ctrl_req.addr.exposed =
-                  { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
+                cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
                 cache_ctrl_req.word_count = 1;  // Always 1 word for head (up to 3 bytes)
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
                 cache_ctrl_req.be = (1 << head_bytes_q) - 1;
@@ -1725,8 +1727,7 @@ module w25q128jw_controller
                 // Cache request: modify line from SRAM to cache (will set line as dirty)
                 cache_ctrl_req.req = 1'b1;
                 cache_ctrl_req.op = CACHE_WRITE;
-                cache_ctrl_req.addr.exposed =
-                  { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
+                cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
                 cache_ctrl_req.word_count = dma_size_d[15:0];
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
                 cache_ctrl_req.be = 4'hF;
@@ -1809,8 +1810,7 @@ module w25q128jw_controller
                 // Cache request: modify line from SRAM to cache (will set line as dirty)
                 cache_ctrl_req.req = 1'b1;
                 cache_ctrl_req.op = CACHE_WRITE;
-                cache_ctrl_req.addr.exposed =
-                  { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q})[23:0]};
+                cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
                 cache_ctrl_req.word_count = 1;  // Always 1 word for tail (up to 3 bytes)
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
                 cache_ctrl_req.be = (1 << tail_bytes_q) - 1;
@@ -2084,9 +2084,9 @@ module w25q128jw_controller
                 if (CACHE_EN) begin
                   // If cache enabled, we are evicting the sector from cache
                   cache_ctrl_req.req = 1'b1;
-                  cache_ctrl_req.opcode = CACHE_EVICT;
+                  cache_ctrl_req.op = CACHE_EVICT;
                   cache_ctrl_req.addr.exposed =
-                    { 8'h0, victim_sector_offset_q, 12'h0};
+                    { victim_sector_offset_q, 12'h0};
                 end
 
               end else begin
@@ -2246,11 +2246,34 @@ module w25q128jw_controller
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
   // ============== CACHE INSTANTIATION ==============
+  always_comb begin
+    if (CACHE_EN) begin
+      cache_data_bus_we = reg_req_i.valid 
+                            & reg_req_i.write 
+                            & (reg_req_i.addr[BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+      cache_data_bus_re = reg_req_i.valid 
+                            & ~reg_req_i.write
+                            & (reg_req_i.addr[BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+
+      cache_dma_req = '0;
+
+      if (cache_data_bus_we) begin
+        cache_dma_req.req   = 1'b1;
+        cache_dma_req.we    = 1'b1;
+        cache_dma_req.wdata = reg_req_i.wdata;
+        cache_dma_req.be    = reg_req_i.wstrb;
+      end else if (cache_data_bus_re) begin
+        cache_dma_req.req   = 1'b1;
+        cache_dma_req.we    = 1'b0;
+      end
+    end
+  end
+
   cache cache_i (
     .clk_i             (clk_i),
     .rst_ni            (rst_ni),
-    .dma_req_i         (cache_dma_req_i),
-    .dma_resp_o        (cache_dma_resp_o),
+    .dma_req_i         (cache_dma_req),
+    .dma_resp_o        (cache_dma_resp),
     .controller_req_i  (cache_ctrl_req),
     .controller_resp_o (cache_ctrl_resp)
   );

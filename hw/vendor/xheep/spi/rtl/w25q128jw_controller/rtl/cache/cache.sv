@@ -85,7 +85,7 @@ module cache
       target_word_len_d = controller_req_i.word_count;
 
       // Start at requested word offset within sector
-      word_counter_d = controller_req_i.mem_addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
+      word_counter_d = controller_req_i.addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
     end else begin
       unique case (active_op_q)
         CACHE_READ, CACHE_WRITE: begin
