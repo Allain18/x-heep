@@ -371,7 +371,7 @@ module w25q128jw_controller
   cache_reg_pkg::cache_req_t cache_ctrl_req;
   cache_reg_pkg::cache_res_t cache_ctrl_resp;
   obi_pkg::obi_req_t         cache_dma_req;
-  obi_pkg::obi_resp_t        cache_dma_resp; 
+  obi_pkg::obi_resp_t        cache_dma_resp;
   logic cache_data_bus_we, cache_data_bus_re;
 
   // FSM sequential logic
@@ -2245,15 +2245,19 @@ module w25q128jw_controller
   assign hw2reg.status.de = 1'b1;  // Always update status register
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
+  // Forward cache SRAM read data to the CACHE_DATA register so DMA can read it
+  assign hw2reg.cache_data.de = CACHE_EN & cache_dma_resp.rvalid;
+  assign hw2reg.cache_data.d  = cache_dma_resp.rdata;
+
   // ============== CACHE INSTANTIATION ==============
   always_comb begin
     if (CACHE_EN) begin
-      cache_data_bus_we = reg_req_i.valid 
-                            & reg_req_i.write 
-                            & (reg_req_i.addr[BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
-      cache_data_bus_re = reg_req_i.valid 
+      cache_data_bus_we = reg_req_i.valid
+                            & reg_req_i.write
+                            & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+      cache_data_bus_re = reg_req_i.valid
                             & ~reg_req_i.write
-                            & (reg_req_i.addr[BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+                            & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
 
       cache_dma_req = '0;
 
@@ -2283,6 +2287,9 @@ module w25q128jw_controller
         .controller_req_i  (cache_ctrl_req),
         .controller_resp_o (cache_ctrl_resp)
       );
+    end else begin : gen_no_cache
+      assign cache_dma_resp  = '0;
+      assign cache_ctrl_resp = '0;
     end
   endgenerate
 
