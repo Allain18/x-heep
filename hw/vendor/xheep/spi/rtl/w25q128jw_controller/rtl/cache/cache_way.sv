@@ -20,6 +20,7 @@ module cache_way
   output logic [SECTOR_ADDRESS_WIDTH-1:0] victim_sector_o // Only defined in case of miss
 );
 
+  cache_op_e                          active_op_q, active_op_d;
   logic [N_SETS-1:0]                  valid_q, valid_d;
   logic [N_SETS-1:0]                  dirty_q, dirty_d;
   logic [TAG_WIDTH-1:0]               tags_q [N_SETS-1:0], tags_d [N_SETS-1:0];
@@ -34,26 +35,32 @@ module cache_way
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      valid_q <= 'h0;
-      dirty_q <= 'h0;
+      active_op_q <= CACHE_IDLE;
+
+      valid_q     <= 'h0;
+      dirty_q     <= 'h0;
 
       for (int i = 0; i < N_SETS; i++) tags_q[i] <= 'h0;
     end else begin
-      valid_q <= valid_d;
-      dirty_q <= dirty_d;
+      active_op_q <= active_op_d;
+      valid_q     <= valid_d;
+      dirty_q     <= dirty_d;
 
       for (int i = 0; i < N_SETS; i++) tags_q[i] <= tags_d[i];
     end
   end
 
   always_comb begin
-    valid_d = valid_q;
-    dirty_d = dirty_q;
+    active_op_d = active_op_q;
+    valid_d     = valid_q;
+    dirty_d     = dirty_q;
 
     for (int i = 0; i < N_SETS; i++) tags_d[i] = tags_q[i];
 
     if (request_i.req) begin
-      unique case (request_i.op)
+      active_op_d = request_i.op;
+    end else begin
+      unique case (active_op_q)
         CACHE_WRITE: begin
           // Sector is now fully in cache (valid), and may be dirty if it's a write
           if (last_sector_word_i) begin
