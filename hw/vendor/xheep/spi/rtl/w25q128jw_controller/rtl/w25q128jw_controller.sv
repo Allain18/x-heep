@@ -82,7 +82,7 @@ module w25q128jw_controller
   PAGE_BSIZE = 13'h100;  // Page size in bytes
 
   localparam logic [31:0] CACHE_DATA_ADDR = W25Q128JW_CONTROLLER_START_ADDRESS
-                            + {{(32-BlockAw){1'b0}}, W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET};
+                            + {{(32-w25q128jw_controller_reg_pkg::BlockAw){1'b0}}, W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET};
 
   // ============== BYTE SWAP FUNCTION ==============
   function automatic [31:0] bitfield_byteswap32(input [31:0] adress_to_swap);
