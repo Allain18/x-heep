@@ -159,7 +159,9 @@ module cache
     .clk_i(clk_i),
     .rst_ni(rst_ni),
 
-    .request_i(controller_req_i),
+    .active_op_i(active_op_q),
+    .current_set_i(target_set_q),
+    .current_tag_i(target_tag_q),
     .last_sector_word_i(last_sector_word),
 
     .hit_o(hit),

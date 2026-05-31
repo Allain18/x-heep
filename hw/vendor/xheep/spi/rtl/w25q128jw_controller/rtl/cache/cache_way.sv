@@ -12,7 +12,9 @@ module cache_way
   input  logic                            clk_i,
   input  logic                            rst_ni,
 
-  input  cache_req_t                      request_i,
+  cache_op_e                              active_op_i,
+  logic [N_SETS_WIDTH-1:0]                current_set_i,
+  input  [TAG_WIDTH-1:0]                  current_tag_i,
   input  logic                            last_sector_word_i,
 
   output logic                            hit_o,
@@ -20,29 +22,21 @@ module cache_way
   output logic [SECTOR_ADDRESS_WIDTH-1:0] victim_sector_o // Only defined in case of miss
 );
 
-  cache_op_e                          active_op_q, active_op_d;
   logic [N_SETS-1:0]                  valid_q, valid_d;
   logic [N_SETS-1:0]                  dirty_q, dirty_d;
   logic [TAG_WIDTH-1:0]               tags_q [N_SETS-1:0], tags_d [N_SETS-1:0];
 
-  logic [N_SETS_WIDTH-1:0]            current_set;
-  logic [TAG_WIDTH-1:0]               current_tag;
   logic                               hit;
 
-  assign current_set = request_i.addr.internal.set;
-  assign current_tag = request_i.addr.internal.tag;
-  assign hit         = valid_q[current_set] & (tags_q[current_set] == current_tag);
+  assign hit         = valid_q[current_set_i] & (tags_q[current_set_i] == current_tag_i);
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      active_op_q <= CACHE_IDLE;
-
       valid_q     <= 'h0;
       dirty_q     <= 'h0;
 
       for (int i = 0; i < N_SETS; i++) tags_q[i] <= 'h0;
     end else begin
-      active_op_q <= active_op_d;
       valid_q     <= valid_d;
       dirty_q     <= dirty_d;
 
@@ -51,39 +45,34 @@ module cache_way
   end
 
   always_comb begin
-    active_op_d = active_op_q;
     valid_d     = valid_q;
     dirty_d     = dirty_q;
 
     for (int i = 0; i < N_SETS; i++) tags_d[i] = tags_q[i];
 
-    if (request_i.req) begin
-      active_op_d = request_i.op;
-    end else begin
-      unique case (active_op_q)
-        CACHE_WRITE: begin
-          // Sector is now fully in cache (valid), and may be dirty if it's a write
-          if (last_sector_word_i) begin
-            valid_d[current_set] = 1'b1;
-            dirty_d[current_set] = request_i.dirty;
-            tags_d[current_set]  = current_tag;
-          end
+    unique case (active_op_i)
+      CACHE_WRITE: begin
+        // Sector is now fully in cache (valid), and may be dirty if it's a write
+        if (last_sector_word_i) begin
+          valid_d[current_set_i] = 1'b1;
+          dirty_d[current_set_i] = request_i.dirty;
+          tags_d[current_set_i]  = current_tag_i;
         end
+      end
 
-        CACHE_EVICT: begin
-          // Sector is evicted (not valid)
-          if (hit) begin
-            valid_d[current_set] = 1'b0;
-          end
+      CACHE_EVICT: begin
+        // Sector is evicted (not valid)
+        if (hit) begin
+          valid_d[current_set_i] = 1'b0;
         end
+      end
 
-        default: ;
-      endcase
-    end
+      default: ;
+    endcase
   end
 
   assign hit_o   = hit;
-  assign dirty_o = dirty_q[current_set];
-  assign victim_sector_o = {tags_q[current_set], current_set};
+  assign dirty_o = dirty_q[current_set_i];
+  assign victim_sector_o = {tags_q[current_set_i], current_set_i};
 
 endmodule
