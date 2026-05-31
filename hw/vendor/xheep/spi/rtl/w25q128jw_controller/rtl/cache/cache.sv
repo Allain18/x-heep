@@ -34,6 +34,7 @@ module cache
   logic [N_SETS_WIDTH-1:0]            target_set_q, target_set_d;
   logic [TAG_WIDTH-1:0]               target_tag_q, target_tag_d;
   logic [SECTOR_SIZE_WORDS_WIDTH:0]   target_word_len_q, target_word_len_d; // Number of words to transfer
+  logic                               target_dirty_q, target_dirty_d; // Only valid for WRITE, indicates whether the sector being written is dirty or clean
 
   // Cache way(s) signals
   logic                               hit;
@@ -60,12 +61,14 @@ module cache
       target_set_q      <= '0;
       target_tag_q      <= '0;
       target_word_len_q <= '0;
+      target_dirty_q    <= '0;
     end else begin
       active_op_q       <= active_op_d;
       word_counter_q    <= word_counter_d;
       target_set_q      <= target_set_d;
       target_tag_q      <= target_tag_d;
       target_word_len_q <= target_word_len_d;
+      target_dirty_q    <= target_dirty_d;
     end
   end
 
@@ -75,6 +78,7 @@ module cache
     target_set_d      = target_set_q;
     target_tag_d      = target_tag_q;
     target_word_len_d = target_word_len_q;
+    target_dirty_d    = target_dirty_q;
 
     last_sector_word  = (target_word_len_q == 'h0);
 
@@ -83,6 +87,7 @@ module cache
       target_set_d      = controller_req_i.addr.internal.set;
       target_tag_d      = controller_req_i.addr.internal.tag;
       target_word_len_d = controller_req_i.word_count;
+      target_dirty_d    = controller_req_i.dirty;
 
       // Start at requested word offset within sector
       word_counter_d    = controller_req_i.addr.internal.byte_offset[SECTOR_SIZE_BYTES_WIDTH-1:2];
@@ -158,6 +163,7 @@ module cache
     .active_op_i(active_op_q),
     .current_set_i(target_set_q),
     .current_tag_i(target_tag_q),
+    .request_dirty_i(target_dirty_q),
     .last_sector_word_i(last_sector_word),
 
     .hit_o(hit),

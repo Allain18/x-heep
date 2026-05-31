@@ -15,6 +15,7 @@ module cache_way
   cache_op_e                              active_op_i,
   logic [N_SETS_WIDTH-1:0]                current_set_i,
   input  [TAG_WIDTH-1:0]                  current_tag_i,
+  input  logic                            request_dirty_i, // Only valid for WRITE, indicates whether the sector being written is dirty or clean
   input  logic                            last_sector_word_i,
 
   output logic                            hit_o,
@@ -55,7 +56,7 @@ module cache_way
         // Sector is now fully in cache (valid), and may be dirty if it's a write
         if (last_sector_word_i) begin
           valid_d[current_set_i] = 1'b1;
-          dirty_d[current_set_i] = request_i.dirty;
+          dirty_d[current_set_i] = request_dirty_i;
           tags_d[current_set_i]  = current_tag_i;
         end
       end
