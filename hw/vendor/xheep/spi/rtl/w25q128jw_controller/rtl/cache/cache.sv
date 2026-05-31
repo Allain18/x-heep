@@ -74,7 +74,6 @@ module cache
     word_counter_d    = word_counter_q;
     target_set_d      = target_set_q;
     target_tag_d      = target_tag_q;
-    target_word_d     = target_start_q;
     target_word_len_d = target_word_len_q;
 
     last_sector_word  = (target_word_len_q == 'h0);
