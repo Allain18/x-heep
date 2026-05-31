@@ -80,7 +80,8 @@ module cache
     target_word_len_d = target_word_len_q;
     target_dirty_d    = target_dirty_q;
 
-    last_sector_word  = (target_word_len_q == 'h0);
+    // Last word of the sector is being transferred in current cycle
+    last_sector_word  = (target_word_len_q == 'h1) & dma_req_i.req;
 
     if (controller_req_i.req) begin
       active_op_d       = controller_req_i.op;
