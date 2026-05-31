@@ -34,8 +34,9 @@ package cache_reg_pkg;
     } internal;
   } addr_t;
 
-  typedef enum logic [1:0] {
+  typedef enum logic [2:0] {
     CACHE_IDLE,
+    CACHE_CHECK,  // Check for hit/miss
     CACHE_READ,   // stream word from cache -> DMA
     CACHE_WRITE,  // stream word from DMA -> cache
     CACHE_EVICT   // set sector as invalid within the cache

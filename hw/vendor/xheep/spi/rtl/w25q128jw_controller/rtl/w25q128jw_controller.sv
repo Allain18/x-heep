@@ -540,14 +540,15 @@ module w25q128jw_controller
         case (check_cache_state_q)
           // -------- IDLE: Trigger Cache request --------
           CHECK_CACHE_IDLE: begin
+            cache_ctrl_req.req = 1'b1;
+            cache_ctrl_req.op = CACHE_CHECK;
             cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + sector_iter_offset_q) & 32'h00ffffff};
+
             check_cache_state_d = CHECK_CACHE_RESPONSE;
           end
 
           // -------- RESPONSE: Evaluate Cache response --------
           CHECK_CACHE_RESPONSE: begin
-            cache_ctrl_req.addr.exposed = {8'h0, (reg2hw.f_address.q + sector_iter_offset_q) & 32'h00ffffff};
-
             if (cache_ctrl_resp.hit) begin
               check_cache_state_d = CHECK_CACHE_HIT;
             end else begin
