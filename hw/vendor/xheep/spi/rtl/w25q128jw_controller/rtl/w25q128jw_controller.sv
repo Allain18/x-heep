@@ -2250,9 +2250,17 @@ module w25q128jw_controller
   assign hw2reg.status.de = 1'b1;  // Always update status register
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
+  // Byte-lane alignment: rotate rdata so the target byte lands at [7:0].
+  // - For body (word-aligned) reads, (f_address + md_offset)[1:0] == 0, no modification
+  // - For head/tail byte transfers, it extracts the correct sub-word byte for the DMA.
+  logic [1:0]  cache_byte_lane;
+  logic [31:0] cache_rdata_aligned;
+  assign cache_byte_lane    = (reg2hw.f_address.q + transfer_byte_offset_q)[1:0];
+  assign cache_rdata_aligned = cache_dma_resp.rdata >> ({3'b0, cache_byte_lane} << 3);
+
   // Forward cache SRAM read data to the CACHE_DATA register so DMA can read it
   assign hw2reg.cache_data.de = CACHE_EN & cache_dma_resp.rvalid;
-  assign hw2reg.cache_data.d  = cache_dma_resp.rdata;
+  assign hw2reg.cache_data.d  = cache_rdata_aligned;
 
   // ============== CACHE INSTANTIATION ==============
   always_comb begin
@@ -2316,7 +2324,7 @@ module w25q128jw_controller
   assign reg_rsp_o.ready = reg_rsp_int.ready
                             & ~(CACHE_EN & cache_data_bus_re & ~cache_dma_resp.rvalid);
   assign reg_rsp_o.rdata = (CACHE_EN & cache_dma_resp.rvalid & cache_data_bus_re)
-                            ? cache_dma_resp.rdata : reg_rsp_int.rdata;
+                            ? cache_rdata_aligned : reg_rsp_int.rdata;
   assign reg_rsp_o.error = reg_rsp_int.error;
 
 endmodule
