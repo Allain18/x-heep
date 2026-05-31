@@ -769,9 +769,10 @@ module w25q128jw_controller
         case (read_state_q)
           // -------- IDLE: Trigger DMA initialization --------
           READ_IDLE: begin
-            if (!CACHE_EN) begin
+            if (CACHE_EN) begin
               // If there is a cache, we always read an entire sector (no head/tail)
-
+            end else begin
+              // If no cache, compute head/tail bytes for unaligned transfers
               if (reg2hw.control.rnw.q) begin
                 // READ: Number of bytes to copy 1 by 1 before & after word-aligned transfer
                 head_bytes_d = 2'h0 - reg2hw.s_address.q[1:0];
@@ -782,10 +783,15 @@ module w25q128jw_controller
                   tail_bytes_d = reg2hw.s_address.q[1:0] + reg2hw.length.q[1:0];
                 end
               end
+
+              // When no cache, every read request is independent, needs to reset md_offset
+              if (reg2hw.control.rnw.q) begin
+                md_offset_d = 32'h0;
+              end
             end
 
-            // Reset md_offset for: all reads or first sector of a new write
-            if (reg2hw.control.rnw.q || sector_iter_offset_q == 32'h0) begin
+            // Reset md_offset for first sector of a new write
+            if (sector_iter_offset_q == 32'h0) begin
               md_offset_d = 32'h0; // TODO: what is md_offset? To be renamed, it's confusing
             end
 
