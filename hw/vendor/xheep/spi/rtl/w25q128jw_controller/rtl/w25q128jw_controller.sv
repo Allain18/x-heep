@@ -2255,7 +2255,7 @@ module w25q128jw_controller
   // - For head/tail byte transfers, it extracts the correct sub-word byte for the DMA.
   logic [1:0]  cache_byte_lane;
   logic [31:0] cache_rdata_aligned;
-  assign cache_byte_lane    = (reg2hw.f_address.q + transfer_byte_offset_q)[1:0];
+  assign cache_byte_lane    = (reg2hw.f_address.q + transfer_byte_offset_q) & 2'b11;
   assign cache_rdata_aligned = cache_dma_resp.rdata >> ({3'b0, cache_byte_lane} << 3);
 
   // Forward cache SRAM read data to the CACHE_DATA register so DMA can read it
