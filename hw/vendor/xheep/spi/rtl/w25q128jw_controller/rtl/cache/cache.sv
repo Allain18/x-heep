@@ -189,7 +189,7 @@ module cache
 
   // DMA response
   assign dma_resp_o.gnt    = gnt; // TODO: may need to add DONE signal, to avoid overlapping transactions
-  assign dma_resp_o.rvalid = rvalid[SramLatency-1];
+  assign dma_resp_o.rvalid = rvalid[SramLatency-1] & (active_op_q == CACHE_READ);
   assign dma_resp_o.rdata  = mem_rdata;
 
   // Controller response
