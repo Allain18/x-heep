@@ -2308,7 +2308,7 @@ module w25q128jw_controller
   // If cache read requested, delay ready until cache response is valid
   assign reg_rsp_o.ready = reg_rsp_int.ready
                             & ~(CACHE_EN & cache_data_bus_re & ~cache_dma_resp.rvalid);
-  assign reg_rsp_o.rdata = (CACHE_EN & cache_DMA_resp.rvalid & cache_data_bus_re)
+  assign reg_rsp_o.rdata = (CACHE_EN & cache_dma_resp.rvalid & cache_data_bus_re)
                             ? cache_dma_resp.rdata : reg_rsp_int.rdata;
   assign reg_rsp_o.error = reg_rsp_int.error;
 
