@@ -678,7 +678,7 @@ module w25q128jw_controller
 
               set_dma_regs(CACHE_DATA_ADDR,
                             reg2hw.s_address.q + md_offset_q,
-                            32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=4 (word)
+                            32'h0, 32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
                             2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
                             'h0, 'h0,
                             reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
