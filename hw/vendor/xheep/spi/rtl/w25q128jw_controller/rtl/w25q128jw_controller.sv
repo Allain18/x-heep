@@ -374,6 +374,9 @@ module w25q128jw_controller
   obi_pkg::obi_resp_t        cache_dma_resp;
   logic cache_data_bus_we, cache_data_bus_re;
 
+  // Intermediate signals
+  reg_rsp_t reg_rsp_int;
+
   // FSM sequential logic
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -2296,9 +2299,17 @@ module w25q128jw_controller
       .clk_i(clk_i),
       .rst_ni(rst_ni),
       .reg_req_i,
-      .reg_rsp_o,
+      .reg_rsp_o(reg_rsp_int),
       .reg2hw,
       .hw2reg,
       .devmode_i(1'b1)
   );
+
+  // If cache read requested, delay ready until cache response is valid
+  assign reg_rsp_o.ready = reg_rsp_int.ready
+                            & ~(CACHE_EN & cache_data_bus_re & ~cache_dma_resp.rvalid);
+  assign reg_rsp_o.rdata = (CACHE_EN & cache_DMA_resp.rvalid & cache_data_bus_re)
+                            ? cache_dma_resp.rdata : reg_rsp_int.rdata;
+  assign reg_rsp_o.error = reg_rsp_int.error;
+
 endmodule
