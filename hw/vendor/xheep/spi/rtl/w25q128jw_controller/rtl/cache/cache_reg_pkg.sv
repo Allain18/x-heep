@@ -46,7 +46,7 @@ package cache_reg_pkg;
     logic                                 req;        // high on a new request
     cache_op_e                            op;         // read or write
     addr_t                                addr;       // address to read/write, byte-addressable
-    logic [SECTOR_SIZE_WORDS_WIDTH-1:0]   word_count; // number of words to read/write in current request
+    logic [SECTOR_SIZE_WORDS_WIDTH:0]     word_count; // number of words to read/write in current request
     logic                                 dirty;      // (Write only) 1 if sector written is dirty, 0 if clean
   } cache_req_t;
 
