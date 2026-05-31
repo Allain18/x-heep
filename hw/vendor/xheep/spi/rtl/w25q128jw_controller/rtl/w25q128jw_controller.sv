@@ -631,7 +631,7 @@ module w25q128jw_controller
                             reg2hw.s_address.q + md_offset_q,
                             32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=1 (byte)
                             2'h0, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
-                            'h4, 'h0,
+                            'h0, 'h0,
                             reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
                             {14'h0, head_bytes_q});  // size (in bytes)
 
@@ -677,7 +677,7 @@ module w25q128jw_controller
                             reg2hw.s_address.q + md_offset_q,
                             32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=4 (word)
                             2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                            'h4, 'h0,
+                            'h0, 'h0,
                             reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
                             dma_size_d[15:0]);  // size (in words)
 
@@ -730,7 +730,7 @@ module w25q128jw_controller
                           reg2hw.s_address.q + md_offset_q,
                           32'h0, 32'h1,  // src_inc=0 (FIFO), dst_inc=1 (byte)
                           2'h0, 2'h2,  // src_data_type=32-bit, dst_data_type=8-bit
-                          'h4, 'h0,
+                          'h0, 'h0,
                           reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
                           {14'h0, tail_bytes_q});  // size (in bytes)
 
