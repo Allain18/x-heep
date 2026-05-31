@@ -2264,7 +2264,7 @@ module w25q128jw_controller
         cache_dma_req.we    = 1'b1;
         cache_dma_req.wdata = reg_req_i.wdata;
         cache_dma_req.be    = reg_req_i.wstrb;
-      end else if (cache_data_bus_re) begin
+      end else if (cache_data_bus_re && !cache_dma_resp.rvalid) begin
         cache_dma_req.req   = 1'b1;
         cache_dma_req.we    = 1'b0;
       end
