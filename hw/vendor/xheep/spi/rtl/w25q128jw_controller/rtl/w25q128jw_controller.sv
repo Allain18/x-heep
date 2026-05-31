@@ -805,7 +805,6 @@ module w25q128jw_controller
               cache_ctrl_req.addr.exposed = {8'h0, ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q) & 32'h00ffffff};
               cache_ctrl_req.word_count = dma_size_d[15:0];
               cache_ctrl_req.dirty = 1'b0;
-              cache_ctrl_req.be = 4'hF;
 
               set_dma_regs(SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET},
                           CACHE_DATA_ADDR,
@@ -1676,7 +1675,6 @@ module w25q128jw_controller
                 cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
                 cache_ctrl_req.word_count = 1;  // Always 1 word for head (up to 3 bytes)
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
-                cache_ctrl_req.be = (1 << head_bytes_q) - 1;
 
                 set_dma_regs(reg2hw.md_address.q + md_offset_q,
                             CACHE_DATA_ADDR,
@@ -1730,7 +1728,6 @@ module w25q128jw_controller
                 cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
                 cache_ctrl_req.word_count = dma_size_d[15:0];
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
-                cache_ctrl_req.be = 4'hF;
 
                 set_dma_regs(reg2hw.md_address.q + md_offset_q,
                             CACHE_DATA_ADDR,
@@ -1813,7 +1810,6 @@ module w25q128jw_controller
                 cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
                 cache_ctrl_req.word_count = 1;  // Always 1 word for tail (up to 3 bytes)
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
-                cache_ctrl_req.be = (1 << tail_bytes_q) - 1;
 
                 set_dma_regs(reg2hw.md_address.q + md_offset_q,
                             CACHE_DATA_ADDR,
@@ -2015,7 +2011,6 @@ module w25q128jw_controller
                 cache_ctrl_req.addr.exposed =
                   { 8'h0, victim_sector_offset_q, 12'h0};
                 cache_ctrl_req.word_count = SE_WSIZE;
-                cache_ctrl_req.be = 4'hF;
               end
 
               set_dma_regs(CACHE_DATA_ADDR,
