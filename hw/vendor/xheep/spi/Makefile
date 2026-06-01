@@ -41,5 +41,4 @@ $(W25Q_DOC_FILE): $(W25Q_CFG)
 .PHONY: vendor
 vendor:
 	python3 util/vendor.py -Uv vendor/lowrisc_opentitan_spi_host.vendor.hjson
-	python3 util/vendor.py -Uv vendor/yosyshq_picorv32.vendor.hjson
-	python3 util/vendor.py -Uv vendor/pulp_platform.vendor.hjson
+	python3 util/vendor.py -Uv vendor/pulp_platform_register_interface.vendor.hjson
