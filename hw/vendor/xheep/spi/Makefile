@@ -1,4 +1,4 @@
-REGTOOL ?= vendor/pulp_platform/register_interface/vendor/lowrisc_opentitan/util/regtool.py
+REGTOOL ?= vendor/pulp_platform_register_interface/vendor/lowrisc_opentitan/util/regtool.py
 PERIPH_STRUCTS_GEN ?= util/periph_structs_gen/periph_structs_gen.py
 TEMPLATE_FILE ?= util/periph_structs_gen/periph_structs.tpl
 
