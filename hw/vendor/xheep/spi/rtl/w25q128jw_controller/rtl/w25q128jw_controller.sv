@@ -565,6 +565,7 @@ module w25q128jw_controller
               top_state_d = TOP_READ_CACHE;
             end else begin
               top_state_d = TOP_MODIFY;
+              modify_state_d = MODIFY_IDLE;
             end
 
             check_cache_state_d = CHECK_CACHE_IDLE;
@@ -1682,7 +1683,12 @@ module w25q128jw_controller
                 // Cache request: modify line from SRAM to cache (will set line as dirty)
                 cache_ctrl_req.req = 1'b1;
                 cache_ctrl_req.op = CACHE_WRITE;
-                cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
+                cache_ctrl_req.addr.exposed = {
+                  8'h0,
+                  ((reg2hw.f_address.q & 32'h00fff000)
+                    + sector_iter_offset_q
+                    + {20'h0, sector_offset_q}) & 32'h00ffffff
+                };
                 cache_ctrl_req.word_count = 1;  // Always 1 word for head (up to 3 bytes)
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
 
@@ -2100,7 +2106,7 @@ module w25q128jw_controller
                   cache_ctrl_req.req = 1'b1;
                   cache_ctrl_req.op = CACHE_EVICT;
                   cache_ctrl_req.addr.exposed =
-                    { victim_sector_offset_q, 12'h0};
+                    { 8'h0, victim_sector_offset_q, 12'h0};
                 end else if (reg2hw.length.q != 0) begin
                   // If no cache and more sectors to process, move to next sector
                   sector_iter_offset_d = sector_iter_offset_q + {19'b0, SE_BSIZE}; // Next sector (+4KB)
