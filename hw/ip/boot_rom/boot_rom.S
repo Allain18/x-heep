@@ -2,7 +2,6 @@
 
 #include "core_v_mini_mcu.h"
 #include "soc_ctrl_regs.h"
-#include "spi_memio_regs.h"
 #include "power_manager_regs.h"
 #include "spi_host_regs.h"
 
