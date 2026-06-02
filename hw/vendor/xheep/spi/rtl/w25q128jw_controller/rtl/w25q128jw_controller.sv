@@ -1735,7 +1735,12 @@ module w25q128jw_controller
                 // Cache request: modify line from SRAM to cache (will set line as dirty)
                 cache_ctrl_req.req = 1'b1;
                 cache_ctrl_req.op = CACHE_WRITE;
-                cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
+                cache_ctrl_req.addr.exposed = {
+                  8'h0,
+                  ((reg2hw.f_address.q & 32'h00fff000)
+                    + sector_iter_offset_q
+                    + {20'h0, sector_offset_q}) & 32'h00ffffff
+                };
                 cache_ctrl_req.word_count = dma_size_d[15:0];
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
 
@@ -1819,7 +1824,12 @@ module w25q128jw_controller
                 // Cache request: modify line from SRAM to cache (will set line as dirty)
                 cache_ctrl_req.req = 1'b1;
                 cache_ctrl_req.op = CACHE_WRITE;
-                cache_ctrl_req.addr.exposed = { 8'h0, ((reg2hw.f_address.q & 32'h00fff000) + {20'h0, sector_offset_q}) & 32'h00ffffff };
+                cache_ctrl_req.addr.exposed = {
+                  8'h0,
+                  ((reg2hw.f_address.q & 32'h00fff000)
+                    + sector_iter_offset_q
+                    + {20'h0, sector_offset_q}) & 32'h00ffffff
+                };
                 cache_ctrl_req.word_count = 1;  // Always 1 word for tail (up to 3 bytes)
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
 
