@@ -238,6 +238,71 @@ static int run_case(
 }
 
 /**
+ * @brief Test cache writeback by writing to sector 0 (marks it dirty), then writing to
+ *        sector 4 (same cache set, forces eviction + writeback of sector 0), then
+ *        reading back sector 0 from flash to verify the writeback committed.
+ * @return 0 if writeback is verified, 1 otherwise.
+ */
+static int run_cache_writeback_test(
+    const char *mode_name,
+    const void *sram_source_base,
+    const void *flash_dest_base,
+    void *sram_read_back_base,
+    uint32_t flags
+) {
+    char test_name[128];
+    snprintf(test_name, sizeof(test_name), "%s, cache writeback (sector 0 evicted by sector 4)", mode_name);
+
+    void *flash_sector0 = (void *)flash_dest_base;
+    void *flash_sector4 = (void *)((const char *)flash_dest_base + 4U * SECTOR_SIZE_BYTES);
+
+    PRINTF("%d) %s: ", test_counter++, test_name);
+
+    // Write sector 0: loads it into cache as dirty
+    if (do_write(sram_source_base, flash_sector0, SECTOR_SIZE_BYTES, flags) != 0) {
+        PRINTF("write sector 0 failed\n");
+        #if STOP_ON_FIRST_FAILURE
+            exit(EXIT_FAILURE);
+        #else
+            return 1;
+        #endif
+    }
+
+    // Write sector 4: same cache set as sector 0, forces eviction and writeback
+    if (do_write(sram_source_base, flash_sector4, SECTOR_SIZE_BYTES, flags) != 0) {
+        PRINTF("write sector 4 failed\n");
+        #if STOP_ON_FIRST_FAILURE
+            exit(EXIT_FAILURE);
+        #else
+            return 1;
+        #endif
+    }
+
+    // Sector 0 has been evicted; read it back (cache miss -> fetch from flash)
+    memset(sram_read_back_base, SRAM_GUARD_PATTERN, SECTOR_SIZE_BYTES);
+    if (safe_read(flash_sector0, sram_read_back_base, SECTOR_SIZE_BYTES) != 0) {
+        PRINTF("read back sector 0 failed\n");
+        #if STOP_ON_FIRST_FAILURE
+            exit(EXIT_FAILURE);
+        #else
+            return 1;
+        #endif
+    }
+
+    if (compare_buffers(sram_source_base, sram_read_back_base, SECTOR_SIZE_BYTES) != 0) {
+        PRINTF("FAIL\n");
+        #if STOP_ON_FIRST_FAILURE
+            exit(EXIT_FAILURE);
+        #else
+            return 1;
+        #endif
+    }
+
+    PRINTF("PASS\n");
+    return 0;
+}
+
+/**
  * @brief Run the standard set of write tests for a given mode.
  * @return Number of failing test cases.
  */
@@ -331,6 +396,10 @@ static uint32_t run_mode_tests(
         test_name,
         sram_source_base, flash_dest_base, sram_read_back_base, sram_expected_base,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, flags
+    );
+
+    errors += run_cache_writeback_test(
+        mode_name, sram_source_base, flash_dest_base, sram_read_back_base, flags
     );
 
     return errors;
