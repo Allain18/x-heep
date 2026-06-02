@@ -1,10 +1,15 @@
-/**
- * This module contains the metadata for each of the cache ways.
- * It is used to check a hit/miss, if the line is dirty and which line to replace
- * if needed.
- *
- * The cache data lives in `cache.sv`.
- */
+// Copyright 2026 EPFL
+// Solderpad Hardware License, Version 2.1, see LICENSE.md for details.
+// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+//
+// This module contains the metadata for each of the cache ways.
+// It is used to check a hit/miss, if the line is dirty and which line to replace
+// if needed.
+//
+// The cache data lives in `cache.sv`.
+//
+// Author: Patrick Pataky     <patrick.pataky@epfl.ch>
+//                            <patdb10@gmail.com>
 
 module cache_way
   import cache_reg_pkg::*;

@@ -1,8 +1,13 @@
-/**
- * SRAM bank instantiation heavily inspired by:
- *   "hw/vendor/pulp_platform/tech_cells_generic/src/fpga/tc_sram_xilinx.sv"
- *   "hw/ip_examples/slow_memory/rtl/slow_memory.sv"
- */
+// Copyright 2026 EPFL
+// Solderpad Hardware License, Version 2.1, see LICENSE.md for details.
+// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+//
+// SRAM bank instantiation heavily inspired by:
+//   "hw/vendor/pulp_platform/tech_cells_generic/src/fpga/tc_sram_xilinx.sv"
+//   "hw/ip_examples/slow_memory/rtl/slow_memory.sv"
+//
+// Author: Patrick Pataky     <patrick.pataky@epfl.ch>
+//                            <patdb10@gmail.com>
 
 module cache
   import cache_reg_pkg::*;
