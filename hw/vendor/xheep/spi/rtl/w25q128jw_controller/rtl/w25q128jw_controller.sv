@@ -1800,6 +1800,8 @@ module w25q128jw_controller
 
                 if (CACHE_EN) begin
                   // Start again with next sector if cache enabled
+                  sector_iter_offset_d = sector_iter_offset_q + {19'h0, SE_BSIZE};
+
                   top_state_d = TOP_CHECK_CACHE;
                   check_cache_state_d = CHECK_CACHE_IDLE;
                 end
