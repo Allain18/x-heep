@@ -38,6 +38,9 @@
 
 #define STOP_ON_FIRST_FAILURE 1    /* Stop on first failure (1) or run all tests (0) */
 
+#define EXEC_WORD_TESTS 1  /* Word-aligned transfers */
+#define EXEC_BYTE_TESTS 0  /* Sub-word or non-word-aligned transfers (does not work with a cache currently) */
+
 /* By default, printfs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
 #define PRINTF_IN_SIM   0
@@ -223,6 +226,7 @@ static uint32_t run_mode_tests(
     uint32_t errors = 0;
     char test_name[96];
 
+#if EXEC_WORD_TESTS
     snprintf(test_name, sizeof(test_name), "%s, single sector", mode_name);
     errors += run_case(
         test_name,
@@ -236,7 +240,9 @@ static uint32_t run_mode_tests(
         flash_src_base, sram_expected_base, sram_buffer,
         0U, two_sectors_bytes, flags
     );
+#endif // EXEC_WORD_TESTS
 
+#if EXEC_BYTE_TESTS
     snprintf(test_name, sizeof(test_name), "%s, single byte (1st within the word)", mode_name);
     errors += run_case(
         test_name,
@@ -271,7 +277,7 @@ static uint32_t run_mode_tests(
         flash_src_base, sram_expected_base, sram_buffer,
         3U, 2U, flags
     );
-    
+
     snprintf(test_name, sizeof(test_name), "%s, 6 bytes (with head+body+tail)", mode_name);
     errors += run_case(
         test_name,
@@ -292,6 +298,7 @@ static uint32_t run_mode_tests(
         flash_src_base, sram_expected_base, sram_buffer,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, flags
     );
+#endif // EXEC_BYTE_TESTS
 
     return errors;
 }

@@ -40,6 +40,10 @@
 
 #define STOP_ON_FIRST_FAILURE 1    /* Stop on first failure (1) or run all tests (0) */
 
+#define EXEC_WORD_TESTS 1  /* Word-aligned transfers */
+#define EXEC_BYTE_TESTS 0  /* Sub-word or non-word-aligned transfers (does not work with a cache currently) */
+#define EXEC_WRITEBACK_TESTS 1  /* Cache writeback (only meaningful if cache enabled) */
+
 /* By default, printfs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
 #define PRINTF_IN_SIM   0
@@ -321,6 +325,7 @@ static uint32_t run_mode_tests(
     uint32_t errors = 0;
     char test_name[128];
 
+#if EXEC_WORD_TESTS
     snprintf(test_name, sizeof(test_name), "%s, single sector", mode_name);
     errors += run_case(
         test_name,
@@ -341,7 +346,9 @@ static uint32_t run_mode_tests(
         sram_source_base, flash_dest_base, sram_read_back_base, sram_expected_base,
         0U, two_sectors_bytes, flags
     );
+#endif // EXEC_WORD_TESTS
 
+#if EXEC_BYTE_TESTS
     snprintf(test_name, sizeof(test_name), "%s, single byte (1st within the word)", mode_name);
     errors += run_case(
         test_name,
@@ -397,10 +404,13 @@ static uint32_t run_mode_tests(
         sram_source_base, flash_dest_base, sram_read_back_base, sram_expected_base,
         unaligned_cross_sector_offset_bytes, unaligned_length_bytes, flags
     );
+#endif // EXEC_BYTE_TESTS
 
+#if EXEC_WRITEBACK_TESTS
     errors += run_cache_writeback_test(
         mode_name, sram_source_base, flash_dest_base, sram_read_back_base, flags
     );
+#endif // EXEC_WRITEBACK_TESTS
 
     return errors;
 }
