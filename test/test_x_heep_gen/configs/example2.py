@@ -9,7 +9,6 @@ from x_heep_gen.peripherals.base_peripherals import (
     SOC_ctrl,
     Bootrom,
     SPI_flash,
-    SPI_memio,
     DMA,
     Power_manager,
     RV_timer_ao,

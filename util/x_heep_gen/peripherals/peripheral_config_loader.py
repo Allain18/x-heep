@@ -10,7 +10,6 @@ from x_heep_gen.peripherals.base_peripherals import (
     SOC_ctrl,
     Bootrom,
     SPI_flash,
-    SPI_memio,
     W25Q128JW_Controller,
     DMA,
     Power_manager,
@@ -50,7 +49,6 @@ def load_peripherals_config(system, config: hjson.OrderedDict):
         "soc_ctrl": lambda o, l: SOC_ctrl(o, l),
         "bootrom": lambda o, l: Bootrom(o, l),
         "spi_flash": lambda o, l: SPI_flash(o, l),
-        "spi_memio": lambda o, l: SPI_memio(o, l),
         "w25q128jw_controller": lambda o, l: W25Q128JW_Controller(o, l),
         "dma": _create_dma_peripheral,  # Special handling for complex DMA config
         "power_manager": lambda o, l: Power_manager(o, l),

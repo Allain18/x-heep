@@ -48,10 +48,6 @@
             offset:  0x00020000
             length:  0x00008000
         }
-        spi_memio: {
-            offset:  0x00028000
-            length:  0x00008000
-        }
         dma: {
             offset:  0x00030000
             length:  0x00010000

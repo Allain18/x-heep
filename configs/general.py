@@ -14,7 +14,6 @@ from x_heep_gen.peripherals.base_peripherals import (
     SOC_ctrl,
     Bootrom,
     SPI_flash,
-    SPI_memio,
     W25Q128JW_Controller,
     DMA,
     Power_manager,
@@ -59,7 +58,6 @@ def config():
     base_peripheral_domain.add_peripheral(SOC_ctrl(0x00000000))
     base_peripheral_domain.add_peripheral(Bootrom(0x00010000))
     base_peripheral_domain.add_peripheral(SPI_flash(0x00020000, 0x00008000))
-    base_peripheral_domain.add_peripheral(SPI_memio(0x00028000, 0x00000008))
     base_peripheral_domain.add_peripheral(W25Q128JW_Controller(0x00029000, 0x00007000))
     base_peripheral_domain.add_peripheral(
         DMA(
