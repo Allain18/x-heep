@@ -51,7 +51,7 @@ The controller integrates an optional direct-mapped write-back cache to reduce r
 
 ### Motivation
 
-Each uncached flash read requires a full DMA setup and SPI command sequence (~66 500 clock cycles at 15 MHz). A write requires an additional sector erase and 16 page-program operations (~10 997 000 cycles, or ~733 ms). By caching the active sector in on-chip SRAM, subsequent accesses to the same sector are served in a single clock cycle, reducing per-access cost by a factor of 1024 for sector-local workloads.
+Each uncached flash read requires a full DMA setup and SPI command sequence (~66 500 clock cycles at 100 MHz). A write requires an additional sector erase and 16 page-program operations (~80 000 cycles, or ~1.47 ms). By caching the active sector in on-chip SRAM, subsequent accesses to the same sector are served in a single clock cycle, reducing per-access cost by a factor of 1024 for sector-local workloads.
 
 ### Architecture
 
