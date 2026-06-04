@@ -461,7 +461,6 @@ module w25q128jw_controller
               memio_write_offset = 0;
             end
           endcase
-          // hw2reg.address_memio_write.d = spimemio_req_i.wdata;
 
           memio_be = spimemio_req_i.be;
           spimemio_resp_o.gnt = 1'b1;
