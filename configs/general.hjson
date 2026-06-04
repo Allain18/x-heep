@@ -1,5 +1,4 @@
 {
-    // bus_type: "NtoM"
     bus_type: "onetoM"
     ram_banks: {
         code_and_data: {
