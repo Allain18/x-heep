@@ -63,7 +63,7 @@ int main(void)
 
     w25q128jw_set_buffer();
     PRINTF("Write obi word...\n");
-    ptr32[0] = 0x12345678u;
+    PRINTF("Write result should be 0x12345678u: 0x%x\n", ptr32[0] = 0x12345678u);
 
     PRINTF("Read obi words...\n");
     for(int i = 0; i < 5; i++) {
@@ -72,8 +72,8 @@ int main(void)
     }
 
     PRINTF("Write obi short...\n");
-    ptr16[3] = 0x1234u;
-    ptr16[4] = 0xA1A2u;
+    PRINTF("Write result should be 0x1234u: 0x%x\n", ptr16[3] = 0x1234u);
+    PRINTF("Write result should be 0xA1A2u: 0x%x\n", ptr16[4] = 0xA1A2u);
 
     PRINTF("Read obi short...\n");
     for(int i = 0; i < 10; i++) {
@@ -82,7 +82,7 @@ int main(void)
     }
 
     PRINTF("Write obi byte...\n");
-    ptr8[10] = 0x99u;
+    PRINTF("Write result should be 0x99u: 0x%x\n", ptr8[10] = 0x99u);
 
     PRINTF("Read obi bytes...\n");
     for(int i = 0; i < 20; i++) {
