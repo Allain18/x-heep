@@ -294,8 +294,8 @@ module w25q128jw_controller
   // memio fast-path
   logic [31:0] memio_addr_q, memio_addr_d;
   logic [31:0] memio_data_q, memio_data_d;
-  logic [ 3:0] memio_be;
-  logic [31:0] memio_write_offset;
+  logic [3:0] memio_be_q, memio_be_d;
+  logic [31:0] memio_write_offset_q, memio_write_offset_d;
   memio_state_e memio_state_q, memio_state_d;
 
   // FSM sequential logic
@@ -320,6 +320,8 @@ module w25q128jw_controller
       memio_addr_q <= 32'h0;
       memio_data_q <= 32'h0;
       memio_state_q <= MEMIO_IDLE;
+      memio_be_q <= 4'h0;
+      memio_write_offset_q <= 32'h0;
     end else begin
       dma_init_state_q <= dma_init_state_d;
       dma_init_return_q <= dma_init_return_d;
@@ -337,6 +339,8 @@ module w25q128jw_controller
       memio_addr_q <= memio_addr_d;
       memio_data_q <= memio_data_d;
       memio_state_q <= memio_state_d;
+      memio_be_q <= memio_be_d;
+      memio_write_offset_q <= memio_write_offset_d;
     end
   end
 
@@ -365,6 +369,8 @@ module w25q128jw_controller
     memio_addr_d = memio_addr_q;
     memio_data_d = memio_data_q;
     memio_state_d = memio_state_q;
+    memio_be_d = memio_be_q;
+    memio_write_offset_d = memio_write_offset_q;
 
     sector_offset = 32'h0;
 
@@ -376,6 +382,9 @@ module w25q128jw_controller
     hw2reg.length.d = 32'h0;
     hw2reg.intr_status.de   = 1'b0;
     hw2reg.intr_status.d    = 1'b0;
+
+    hw2reg.address_memio_write.de = 1'b0;
+    hw2reg.address_memio_write.d = 32'h0;
 
     external_dma_hw2reg_o   = '0;
 
@@ -422,47 +431,47 @@ module w25q128jw_controller
               // Byte 0
               hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[7:0]};
               hw2reg.length.d = 32'd1;
-              memio_write_offset = 0;
+              memio_write_offset_d = 0;
             end
             4'h2: begin
               // Byte 1
               hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[15:8]};
               hw2reg.length.d = 32'd1;
-              memio_write_offset = 1;
+              memio_write_offset_d = 1;
             end
             4'h3: begin
               // Bytes 0-1
               hw2reg.address_memio_write.d = {16'h0, spimemio_req_i.wdata[15:0]};
               hw2reg.length.d = 32'd2;
-              memio_write_offset = 0;
+              memio_write_offset_d = 0;
             end
             4'h4: begin
               // Byte 2
               hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[23:16]};
               hw2reg.length.d = 32'd1;
-              memio_write_offset = 2;
+              memio_write_offset_d = 2;
             end
             4'h8: begin
               // Byte 3
               hw2reg.address_memio_write.d = {24'h0, spimemio_req_i.wdata[31:24]};
               hw2reg.length.d = 32'd1;
-              memio_write_offset = 3;
+              memio_write_offset_d = 3;
             end
             4'hC: begin
               // Bytes 2-3
               hw2reg.address_memio_write.d = {16'h0, spimemio_req_i.wdata[31:16]};
               hw2reg.length.d = 32'd2;
-              memio_write_offset = 2;
+              memio_write_offset_d = 2;
             end
             default: begin
               // All bytes (0-3)
               hw2reg.address_memio_write.d = spimemio_req_i.wdata;
               hw2reg.length.d = 32'd4;
-              memio_write_offset = 0;
+              memio_write_offset_d = 0;
             end
           endcase
 
-          memio_be = spimemio_req_i.be;
+          memio_be_d = spimemio_req_i.be;
           spimemio_resp_o.gnt = 1'b1;
 
           memio_state_d = spimemio_req_i.we ? MEMIO_WRITE : MEMIO_READ;
@@ -695,6 +704,7 @@ module w25q128jw_controller
               spimemio_resp_o.rvalid = 1'b1;
               // Clear memio flag and finish transaction
               memio_state_d = MEMIO_IDLE;
+              memio_be_d = 4'h0;
               read_state_d = READ_IDLE;
               top_state_d = TOP_IDLE;
             end
@@ -1217,7 +1227,7 @@ module w25q128jw_controller
             external_dma_hw2reg_o.dst_ptr.de = 1'b1;
             if (memio_state_q == MEMIO_WRITE) begin
               external_dma_hw2reg_o.src_ptr.d  = W25Q128JW_CONTROLLER_START_ADDRESS + {26'b0, W25Q128JW_CONTROLLER_ADDRESS_MEMIO_WRITE_OFFSET};
-              external_dma_hw2reg_o.dst_ptr.d = reg2hw.s_address.q + sector_offset + memio_write_offset;
+              external_dma_hw2reg_o.dst_ptr.d = reg2hw.s_address.q + sector_offset + memio_write_offset_q;
             end else begin
               external_dma_hw2reg_o.src_ptr.d = reg2hw.md_address.q + md_offset_q;
               external_dma_hw2reg_o.dst_ptr.d = reg2hw.s_address.q + sector_offset;
@@ -1231,7 +1241,7 @@ module w25q128jw_controller
             external_dma_hw2reg_o.dst_data_type.de  = 1'b1;
 
             if (memio_state_q == MEMIO_WRITE) begin
-              case (memio_be)
+              case (memio_be_q)
                 4'h1: begin
                   // Byte 0 valid
                   external_dma_hw2reg_o.src_ptr_inc_d1.d  = 'h0;  // No increment, single byte repeated for each word
