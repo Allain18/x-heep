@@ -5,7 +5,7 @@ The X-HEEP system can be configured by three methods:
 - Using an hjson file.
 - Using a Python script (recommended)
 
-If an `hjson` file or `Python` script is used for configuration, the following parameters can be overriden from the make command:
+If an `hjson` file or `Python` script is used for configuration, the following parameters can be overridden from the make command:
 
 - `CPU`
 - `BUS`
@@ -38,7 +38,7 @@ make mcu-gen X_HEEP_CFG=configs/general.hjson
 
 A more complex configuration can be done using a Python script. The default configurations and examples are located in the `configs` directory.
 
-The Python script should include a `config()` function that takes no parameters and returns a {py:class}`x_heep_gen.xheep.XHeep` instance. An example is shown in [configs/general.py](https://github.com/x-heep/x-heep/blob/main/configs/general.py).
+The Python script should include a `config()` function that takes no parameters and returns a {py:class}`xheep.XHeep` instance. An example is shown in [configs/general.py](https://github.com/x-heep/x-heep/blob/main/configs/general.py).
 
 Since not all configurations are yet supported by the Python modelling of X-HEEP, the hjson configuration file must also be provided with the missing configurations. You can find an example of this in the [configs/python_unsupported.hjson](https://github.com/x-heep/x-heep/blob/main/configs/python_unsupported.hjson) file.
 If using the Python config file, the hjson parameters that are supported by Python will be ignored except for the peripherals. Any peripheral not configured in Python will be added from the hjson config.

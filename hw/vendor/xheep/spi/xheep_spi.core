@@ -12,17 +12,12 @@ filesets:
     depend:
       - pulp-platform.org::register_interface
       - lowrisc:ip:spi_host:1.0
+      - x-heep:ip:w25q128jw_controller
     files:
     - rtl/spi_subsystem.sv
     file_type: systemVerilogSource
-
-  files_verilator_waiver:
-    files:
-      - lint/w25q128jw_controller.vlt
-    file_type: vlt
 
 targets:
   default:
     filesets:
     - files_rtl
-    - tool_verilator ? (files_verilator_waiver)
