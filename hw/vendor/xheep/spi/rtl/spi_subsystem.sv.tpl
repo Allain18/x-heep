@@ -6,17 +6,23 @@
   base_peripheral_domain = xheep.get_base_peripheral_domain()
 %>
 
-module spi_subsystem
-  import obi_pkg::*;
-  import reg_pkg::*;
-  import core_v_mini_mcu_pkg::*;
-(
+module spi_subsystem #(
+    // SPI host memory address
+    parameter logic [31:0] SPI_FLASH_START_ADDRESS = 'h0,
+    // External DMA number of channels
+    parameter int unsigned DMA_CH_NUM = 'd1,
+    // OBI and Register Interface data types
+    parameter type obi_req_t = logic,
+    parameter type obi_rsp_t = logic,
+    parameter type reg_req_t = logic,
+    parameter type reg_rsp_t = logic
+) (
     input logic clk_i,
     input logic rst_ni,
 
     // Memory mapped SPI
     input  obi_req_t  spimemio_req_i,
-    output obi_resp_t spimemio_resp_o,
+    output obi_rsp_t  spimemio_resp_o,
 
     // OpenTitan SPI configuration
     input  reg_req_t  ot_reg_req_i,
@@ -31,8 +37,8 @@ module spi_subsystem
     // flash controller interrupt
     output logic w25q128jw_controller_intr_o,
 
-    input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] dma_ready_i,
-    input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] dma_done_i,
+    input logic [DMA_CH_NUM-1:0] dma_ready_i,
+    input logic [DMA_CH_NUM-1:0] dma_done_i,
 
     // SPI Interface
     output logic                               spi_flash_sck_o,
@@ -51,7 +57,6 @@ module spi_subsystem
     output logic spi_flash_rx_valid_o,
     output logic spi_flash_tx_ready_o
 );
-
   // OpenTitan SPI Interface
   logic                               ot_spi_sck;
   logic                               ot_spi_sck_en;
@@ -98,8 +103,8 @@ module spi_subsystem
 
   reg_mux #(
       .NoPorts(2),
-      .req_t  (reg_pkg::reg_req_t),
-      .rsp_t  (reg_pkg::reg_rsp_t),
+      .req_t  (reg_req_t),
+      .rsp_t  (reg_rsp_t),
       .AW     (32),
       .DW     (32)
   ) reg_mux_i (
@@ -112,8 +117,10 @@ module spi_subsystem
   );
 
   w25q128jw_controller #(
-      .reg_req_t(reg_pkg::reg_req_t),
-      .reg_rsp_t(reg_pkg::reg_rsp_t)
+      .SPI_FLASH_START_ADDRESS(SPI_FLASH_START_ADDRESS),
+      .DMA_CH_NUM(DMA_CH_NUM),
+      .reg_req_t(reg_req_t),
+      .reg_rsp_t(reg_rsp_t)
   ) w25q128jw_controller_i (
       .clk_i,
       .rst_ni,
@@ -146,7 +153,7 @@ module spi_subsystem
   assign w25q128jw_controller_intr_o = '0;
   assign flash_ctr_reg_rsp_o = '0;
   assign external_dma_hw2reg_o = '0;
-  logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] dma_ready_unused = dma_ready_i;
+  logic [DMA_CH_NUM-1:0] dma_ready_unused = dma_ready_i;
   spi_host_reg_pkg::spi_host_hw2reg_status_reg_t external_spi_host_hw2reg_status_unused = external_spi_host_hw2reg_status;
 % endif
 
@@ -154,8 +161,8 @@ module spi_subsystem
 
   // OpenTitan SPI Snitch Version used for booting
   spi_host #(
-      .reg_req_t(reg_pkg::reg_req_t),
-      .reg_rsp_t(reg_pkg::reg_rsp_t)
+      .reg_req_t(reg_req_t),
+      .reg_rsp_t(reg_rsp_t)
   ) ot_spi_i (
       .clk_i,
       .rst_ni,
