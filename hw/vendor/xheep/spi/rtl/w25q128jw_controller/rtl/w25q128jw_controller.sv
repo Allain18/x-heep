@@ -29,15 +29,18 @@ localparam QUAD_AVAILABLE = 1;
 module w25q128jw_controller
   import dma_reg_pkg::*;
   import spi_host_reg_pkg::*;
-  import obi_pkg::*;
 #(
     // SPI host memory address
     parameter logic [31:0] SPI_FLASH_START_ADDRESS = 'h0,
+    parameter logic [31:0] W25Q128JW_CONTROLLER_START_ADDRESS = 'h0,
     // External DMA number of channels
     parameter int unsigned DMA_CH_NUM = 'd1,
     // Register Interface data types
     parameter type reg_req_t = logic,
-    parameter type reg_rsp_t = logic
+    parameter type reg_rsp_t = logic,
+    // OBI Interface data types
+    parameter type obi_req_t = logic,
+    parameter type obi_rsp_t = logic
 ) (
     input logic clk_i,
     input logic rst_ni,
@@ -48,7 +51,7 @@ module w25q128jw_controller
 
     // Memory mapped SPI
     input  obi_req_t  spimemio_req_i,
-    output obi_resp_t spimemio_resp_o,
+    output obi_rsp_t spimemio_resp_o,
 
     // Interrupt signal
     output logic w25q128jw_controller_intr_o,

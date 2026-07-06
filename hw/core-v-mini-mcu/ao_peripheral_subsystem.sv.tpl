@@ -339,6 +339,7 @@ module ao_peripheral_subsystem
   /* SPI subsystem */
   spi_subsystem #(
     .SPI_FLASH_START_ADDRESS(core_v_mini_mcu_pkg::SPI_FLASH_START_ADDRESS),
+    .W25Q128JW_CONTROLLER_START_ADDRESS(core_v_mini_mcu_pkg::W25Q128JW_CONTROLLER_START_ADDRESS),
     .DMA_CH_NUM(core_v_mini_mcu_pkg::DMA_CH_NUM),
     .obi_req_t(obi_req_t),
     .obi_rsp_t(obi_rsp_t),

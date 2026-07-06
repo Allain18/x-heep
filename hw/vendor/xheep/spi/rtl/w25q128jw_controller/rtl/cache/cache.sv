@@ -11,7 +11,6 @@
 
 module cache
   import cache_reg_pkg::*;
-  import obi_pkg::*;
 #(
   parameter int unsigned SramLatency = 32'd1
 ) (
