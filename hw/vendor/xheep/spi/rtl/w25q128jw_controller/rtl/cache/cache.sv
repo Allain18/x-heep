@@ -12,14 +12,18 @@
 module cache
   import cache_reg_pkg::*;
 #(
-  parameter int unsigned SramLatency = 32'd1
+  parameter int unsigned SramLatency = 32'd1,
+  
+  // OBI Interface data types
+  parameter type obi_req_t = logic,
+  parameter type obi_rsp_t = logic
 ) (
   input  logic           clk_i,
   input  logic           rst_ni,
 
   // DMA (SLAVE) communication
   input  obi_req_t       dma_req_i,
-  output obi_resp_t      dma_resp_o,
+  output obi_rsp_t      dma_resp_o,
 
   // Controller (MASTER) communication
   input  cache_req_t     controller_req_i,
