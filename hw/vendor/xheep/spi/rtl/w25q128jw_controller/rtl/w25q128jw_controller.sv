@@ -29,12 +29,16 @@ localparam QUAD_AVAILABLE = 1;
 module w25q128jw_controller
   import dma_reg_pkg::*;
   import spi_host_reg_pkg::*;
+  import cache_reg_pkg::*;
 #(
     // SPI host memory address
     parameter logic [31:0] SPI_FLASH_START_ADDRESS = 'h0,
     parameter logic [31:0] W25Q128JW_CONTROLLER_START_ADDRESS = 'h0,
     // External DMA number of channels
     parameter int unsigned DMA_CH_NUM = 'd1,
+
+    parameter bit CACHE_EN = 1'b1,  // Set to 1 to enable cache, 0 to disable cache
+
     // Register Interface data types
     parameter type reg_req_t = logic,
     parameter type reg_rsp_t = logic,
@@ -50,7 +54,7 @@ module w25q128jw_controller
     output reg_rsp_t reg_rsp_o,
 
     // Memory mapped SPI
-    input  obi_req_t  spimemio_req_i,
+    input  obi_req_t spimemio_req_i,
     output obi_rsp_t spimemio_resp_o,
 
     // Interrupt signal
@@ -101,6 +105,9 @@ module w25q128jw_controller
   PAGE_WSIZE = 13'h40,  // Page size in words
   PAGE_BSIZE = 13'h100;  // Page size in bytes
 
+  localparam logic [31:0] CACHE_DATA_ADDR = W25Q128JW_CONTROLLER_START_ADDRESS
+                            + {{(32-w25q128jw_controller_reg_pkg::BlockAw){1'b0}}, W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET};
+
   // ============== BYTE SWAP FUNCTION ==============
   function automatic [31:0] bitfield_byteswap32(input [31:0] adress_to_swap);
     bitfield_byteswap32 = {
@@ -122,24 +129,82 @@ module w25q128jw_controller
   endfunction
   // verilog_format: on
 
+  function automatic void set_dma_regs(
+      input logic [31:0] src_ptr, input logic [31:0] dst_ptr, input logic [31:0] src_ptr_inc,
+      input logic [31:0] dst_ptr_inc, input logic [1:0] src_data_type, dst_data_type,
+      input logic [31:0] rx_trigger_slot, input logic [31:0] tx_trigger_slot,
+      input logic [31:0] slot_wait_counter, input logic [15:0] size_d1);
+    // Set DMA source pointer
+    external_dma_hw2reg_o.src_ptr.de = 1'b1;
+    external_dma_hw2reg_o.src_ptr.d = src_ptr;
+    // Set DMA destination pointer
+    external_dma_hw2reg_o.dst_ptr.de = 1'b1;
+    external_dma_hw2reg_o.dst_ptr.d = dst_ptr;
+    // Set source increment
+    external_dma_hw2reg_o.src_ptr_inc_d1.de = 1'b1;
+    external_dma_hw2reg_o.src_ptr_inc_d1.d = src_ptr_inc;
+    // Set destination increment
+    external_dma_hw2reg_o.dst_ptr_inc_d1.de = 1'b1;
+    external_dma_hw2reg_o.dst_ptr_inc_d1.d = dst_ptr_inc;
+    // Set source data type (See hw/vendor/xheep_dma/data/dma.hjson for encoding)
+    external_dma_hw2reg_o.src_data_type.de = 1'b1;
+    external_dma_hw2reg_o.src_data_type.d = src_data_type;
+    // Set destination data type: 1 byte
+    external_dma_hw2reg_o.dst_data_type.de = 1'b1;
+    external_dma_hw2reg_o.dst_data_type.d = dst_data_type;
+    // Set DMA trigger slots (See sw/device/lib/drivers/dma/dma.h for trigger slot mapping)
+    external_dma_hw2reg_o.slot.rx_trigger_slot.de = 1'b1;
+    external_dma_hw2reg_o.slot.rx_trigger_slot.d = rx_trigger_slot;
+    external_dma_hw2reg_o.slot.tx_trigger_slot.de = 1'b1;
+    external_dma_hw2reg_o.slot.tx_trigger_slot.d = tx_trigger_slot;
+    // Set slot wait counter
+    external_dma_hw2reg_o.slot_wait_counter.de = 1'b1;
+    external_dma_hw2reg_o.slot_wait_counter.d = slot_wait_counter;
+
+    // Set transfer size and START DMA
+    // Writing to SIZE_D1 register triggers DMA transaction (See hw/ip/dma/data/dma.hjson)
+    external_dma_hw2reg_o.size_d1.de = 1'b1;
+    external_dma_hw2reg_o.size_d1.d = size_d1;
+  endfunction
+
   // ============================================================================
   // W25Q128JW CONTROLLER FSM
   // ============================================================================
 
   // -------- TOP FSM STATES --------
   // Top controller FSM
-  typedef enum logic [2:0] {
-    TOP_IDLE,     // Wait for start command
-    TOP_READ,     // Read from flash to RAM sector buffer
-    TOP_FWAIT,    // Wait for flash internal operation
-    TOP_ERASE,    // Erase flash sector
-    TOP_MODIFY,   // Modify RAM sector buffer with RAM data to write-back to flash
-    TOP_WRITE,    // Write RAM sector buffer to flash
-    TOP_DMA_INIT  // Initialize DMA registers
+  typedef enum logic [3:0] {
+    TOP_IDLE,         // Wait for start command
+    TOP_CHECK_CACHE,  // Check if data is already within the cache
+    TOP_READ_CACHE,   // Read from cache to RAM
+    TOP_MODIFY,       // Write from RAM to cache
+    TOP_READ,         // Read from flash to cache sector buffer
+    TOP_FWAIT,        // Wait for flash internal operation
+    TOP_ERASE,        // Erase flash sector
+    TOP_WRITE,        // Write a cache sector buffer to flash
+    TOP_DMA_INIT,     // Initialize DMA registers
+    TOP_DONE          // Complete operation and go back to IDLE
   } top_state_e;
+
+  // -------- CHECK_CACHE FSM STATES --------
+  // Check if requested data is already in cache (cache hit) or not (cache miss)
+  typedef enum logic [2:0] {
+    CHECK_CACHE_IDLE,
+    CHECK_CACHE_RESPONSE,
+    CHECK_CACHE_HIT,
+    CHECK_CACHE_MISS_CLEAN,
+    CHECK_CACHE_MISS_DIRTY
+  } check_cache_state_e;
+
+  typedef enum logic [2:0] {
+    READ_CACHE_IDLE,  // Cache request sent
+    READ_CACHE_REGS,  // Configure DMA for transfer
+    READ_CACHE_TRANS  // Wait for DMA transfer complete
+  } read_cache_state_e;
 
   // -------- READ FSM STATES --------
   // Handles flash read operations via SPI & DMA
+  // If cache enabled, always read a single sector to cache
   typedef enum logic [4:0] {
     READ_IDLE,               // Lead to DMA initialization (necessary before every use of DMA)
     READ_SET_DMA,            // Set the DMA registers
@@ -169,7 +234,7 @@ module w25q128jw_controller
     READ_MEMIO_RESTORE_RXWM_W,
 
     READ_TRANS  // Wait for DMA transfer complete
-  } read_state_e;
+  } read_state_e; //TODO: may not work
 
   // -------- FLASH WAIT FSM STATES --------
   // Waits for flash internal operations to complete (erase/program)
@@ -191,11 +256,13 @@ module w25q128jw_controller
   // -------- FLASH WAIT RETURN STATES --------
   // Reset wait status and redirect to correct FSM after flash is ready
   // depending on which operation we were waiting for
-  typedef enum logic [1:0] {
-    FWAIT_RETURN_IDLE,
-    FWAIT_RETURN_ERASE,
-    FWAIT_RETURN_MODIFY,
-    FWAIT_RETURN_WRITE
+  // Note: only used for WRITE operation
+  typedef enum logic [2:0] {
+    FWAIT_RETURN_IDLE, // After READ: -> ERASE
+    FWAIT_RETURN_ERASE, // After ERASE: -> MODIFY
+    FWAIT_RETURN_MODIFY, // After ERASE (no cache): -> MODIFY
+    FWAIT_RETURN_WRITE, // After page < 15: -> WRITE (next page)
+    FWAIT_RETURN_SECTOR_DONE // After page 15: check if more sectors to write
   } fwait_return_e;
 
   // -------- ERASE FSM STATES --------
@@ -219,7 +286,7 @@ module w25q128jw_controller
 
   // -------- MODIFY FSM STATES --------
   // Copies new data into the sector buffer (RAM) at the correct offset
-  // Uses DMA to transfer from ram_new_data to ram_buffer
+  // Uses DMA to transfer from ram_new_data to ram_buffer (or from cache if enabled)
   typedef enum logic [1:0] {
     MODIFY_IDLE,  // Leads to DMA initialization
     MODIFY_DMA_REGS, // Set the DMA registers (ram_new_data + offset (which sector we are now looking to write into + F_ADDRESS sector misalignment))
@@ -246,7 +313,7 @@ module w25q128jw_controller
 
     // DMA configuration for page data transfer
     WRITE_DMA_CHECK_READY,  // Leads to DMA initialization
-    WRITE_DMA_REGS,         // Set DMA source (ram_buffer + page offset)
+    WRITE_DMA_REGS,         // Set DMA source (ram_buffer + page offset, or cache if enabled)
 
     // Finalize page write
     WRITE_TRANS,            // Wait for DMA transfer complete
@@ -269,7 +336,9 @@ module w25q128jw_controller
   typedef enum logic [2:0] {
     RETURN_READ,    // Return to READ FSM (flash -> RAM sector buffer transfer)
     RETURN_MODIFY,  // Return to MODIFY FSM (RAM new data -> RAM sector buffer transfer)
-    RETURN_WRITE    // Return to WRITE FSM (RAM sector buffer -> flash transfer)
+    RETURN_WRITE,    // Return to WRITE FSM (RAM sector buffer -> flash transfer)
+// If cache enabled:
+    RETURN_READ_CACHE // Return to CHECK_CACHE FSM (cache -> RAM sector buffer transfer)
   } dma_init_return_e;
 
   // -------- MEMIO FAST-PATH STATES --------
@@ -290,13 +359,33 @@ module w25q128jw_controller
   dma_init_state_e dma_init_state_q, dma_init_state_d;
   dma_init_return_e dma_init_return_q, dma_init_return_d;
 
+  // If cache enabled
+  check_cache_state_e check_cache_state_q, check_cache_state_d;
+  read_cache_state_e read_cache_state_q, read_cache_state_d;
+
   // Counter and Offset signals
   logic [3:0] page_cnt_q, page_cnt_d;
-  logic [31:0] sector_offset, sector_iter_offset_d, sector_iter_offset_q, md_offset_d, md_offset_q;
+  logic [11:0] sector_offset_q, sector_offset_d;
+  logic [12:0] sector_written_bytes_q, sector_written_bytes_d;
+  logic [31:0] sector_iter_offset_d, sector_iter_offset_q;
   logic [31:0] spi_control_q, spi_control_d;
 
-  logic [31:0] dma_size;
+  // If cache enabled, keep in memory the victim's sector to writeback
+  logic [11:0] victim_sector_offset_d, victim_sector_offset_q;
+
+  logic [31:0] dma_size_q, dma_size_d;
+
   logic [31:0] flash_address;
+
+  // Cache signals
+  cache_reg_pkg::cache_req_t cache_ctrl_req;
+  cache_reg_pkg::cache_res_t cache_ctrl_resp;
+  obi_req_t         cache_dma_req;
+  obi_rsp_t        cache_dma_resp;
+  logic cache_data_bus_we, cache_data_bus_re;
+
+  // Intermediate signals
+  reg_rsp_t reg_rsp_int;
 
   // memio fast-path
   logic [31:0] memio_addr_q, memio_addr_d;
@@ -318,18 +407,31 @@ module w25q128jw_controller
       modify_state_q <= MODIFY_IDLE;
       write_state_q <= WRITE_IDLE;
 
+      if (CACHE_EN) begin
+        check_cache_state_q <= CHECK_CACHE_IDLE;
+        read_cache_state_q <= READ_CACHE_IDLE;
+      end
+
       // -------- Reset: Clear counters and offsets --------
       fwait_return_q   <= FWAIT_RETURN_IDLE;
       page_cnt_q    <= 4'b0;
+      sector_offset_q <= 12'h0;
+      sector_written_bytes_q <= 13'h0;
       sector_iter_offset_q <= 32'h0;
-      md_offset_q <= 32'h0;
       spi_control_q <= 32'h0;
+      dma_size_q <= 32'h0;
       memio_addr_q <= 32'h0;
       memio_data_q <= 32'h0;
       memio_state_q <= MEMIO_IDLE;
       memio_be_q <= 4'h0;
       memio_write_offset_q <= 32'h0;
+
+      if (CACHE_EN) begin
+        victim_sector_offset_q <= 12'h0;
+      end
+
     end else begin
+      // FSM signals
       dma_init_state_q <= dma_init_state_d;
       dma_init_return_q <= dma_init_return_d;
       top_state_q   <= top_state_d;
@@ -338,16 +440,30 @@ module w25q128jw_controller
       fwait_state_q <= fwait_state_d;
       modify_state_q <= modify_state_d;
       write_state_q <= write_state_d;
+
+      if (CACHE_EN) begin
+        check_cache_state_q <= check_cache_state_d;
+        read_cache_state_q <= read_cache_state_d;
+      end
+
+      // Counters and offsets
       fwait_return_q <= fwait_return_d;
       page_cnt_q    <= page_cnt_d;
+      sector_offset_q <= sector_offset_d;
+      sector_written_bytes_q <= sector_written_bytes_d;
       sector_iter_offset_q <= sector_iter_offset_d;
-      md_offset_q <= md_offset_d;
       spi_control_q <= spi_control_d;
       memio_addr_q <= memio_addr_d;
       memio_data_q <= memio_data_d;
       memio_state_q <= memio_state_d;
       memio_be_q <= memio_be_d;
       memio_write_offset_q <= memio_write_offset_d;
+
+      dma_size_q <= dma_size_d;
+
+      if (CACHE_EN) begin
+        victim_sector_offset_q <= victim_sector_offset_d;
+      end
     end
   end
 
@@ -370,8 +486,9 @@ module w25q128jw_controller
     write_state_d = write_state_q;
     fwait_return_d = fwait_return_q;
     page_cnt_d = page_cnt_q;
+    sector_offset_d = sector_offset_q;
+    sector_written_bytes_d = sector_written_bytes_q;
     sector_iter_offset_d = sector_iter_offset_q;
-    md_offset_d = md_offset_q;
     spi_control_d = spi_control_q;
     memio_addr_d = memio_addr_q;
     memio_data_d = memio_data_q;
@@ -379,7 +496,15 @@ module w25q128jw_controller
     memio_be_d = memio_be_q;
     memio_write_offset_d = memio_write_offset_q;
 
-    sector_offset = 32'h0;
+    dma_size_d = dma_size_q;
+
+    if (CACHE_EN) begin
+      check_cache_state_d = check_cache_state_q;
+      read_cache_state_d = read_cache_state_q;
+
+      cache_ctrl_req = '0;
+      victim_sector_offset_d = victim_sector_offset_q;
+    end
 
     hw2reg.control.start.de = 1'b0;
     hw2reg.control.start.d = 1'b0;
@@ -395,7 +520,6 @@ module w25q128jw_controller
 
     external_dma_hw2reg_o   = '0;
 
-    dma_size = '0;
     flash_address = '0;
 
     spi_host_reg_req_o.valid = '0;
@@ -1698,6 +1822,12 @@ module w25q128jw_controller
               RETURN_WRITE: begin
                 top_state_d = TOP_WRITE;  // Continue with flash page programming
               end
+
+              // Only reachable if cache enabled
+              RETURN_READ_CACHE: begin
+                top_state_d = TOP_READ_CACHE;  // Continue with flash read operation with cache
+              end
+
               default: begin
                 top_state_d = TOP_IDLE;
               end
@@ -1708,6 +1838,18 @@ module w25q128jw_controller
             dma_init_state_d = DMA_INIT_IDLE;
           end
         endcase
+      end
+
+      TOP_DONE: begin
+        transfer_byte_offset_d = 32'h0;
+        sector_iter_offset_d = 32'h0;
+
+        hw2reg.control.start.de = 1'b1;
+        hw2reg.control.start.d  = 1'b0;
+        hw2reg.intr_status.de   = 1'b1;
+        hw2reg.intr_status.d    = reg2hw.intr_enable.q;
+
+        top_state_d = TOP_IDLE;
       end
 
       default: begin
@@ -1721,6 +1863,67 @@ module w25q128jw_controller
   assign hw2reg.status.de = 1'b1;  // Always update status register
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
+
+  //TODO: remove alignment
+  // Byte-lane alignment: rotate rdata so the target byte lands at [7:0].
+  // - For body (word-aligned) reads, (f_address + md_offset)[1:0] == 0, no modification
+  // - For head/tail byte transfers, it extracts the correct sub-word byte for the DMA.
+  logic [1:0]  cache_byte_lane;
+  logic [31:0] cache_rdata_aligned;
+  assign cache_byte_lane    = (reg2hw.f_address.q + transfer_byte_offset_q) & 2'b11;
+  assign cache_rdata_aligned = cache_dma_resp.rdata >> ({3'b0, cache_byte_lane} << 3);
+
+  // Forward cache SRAM read data to the CACHE_DATA register so DMA can read it
+  assign hw2reg.cache_data.de = CACHE_EN & cache_dma_resp.rvalid;
+  assign hw2reg.cache_data.d  = cache_rdata_aligned;
+
+  // ============== CACHE INSTANTIATION ==============
+  always_comb begin
+    if (CACHE_EN) begin
+      cache_data_bus_we = reg_req_i.valid
+                            & reg_req_i.write
+                            & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+      cache_data_bus_re = reg_req_i.valid
+                            & ~reg_req_i.write
+                            & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+
+      cache_dma_req = '0;
+
+      if (cache_data_bus_we) begin
+        cache_dma_req.req   = 1'b1;
+        cache_dma_req.we    = 1'b1;
+        cache_dma_req.wdata = reg_req_i.wdata;
+        cache_dma_req.be    = reg_req_i.wstrb;
+      end else if (cache_data_bus_re && !cache_dma_resp.rvalid) begin
+        cache_dma_req.req   = 1'b1;
+        cache_dma_req.we    = 1'b0;
+      end
+    end else begin
+      cache_data_bus_we = 1'b0;
+      cache_data_bus_re = 1'b0;
+      cache_dma_req = '0;
+    end
+  end
+
+  generate
+    if (CACHE_EN) begin : gen_cache
+      cache #(
+        .obi_req_t(obi_req_t),
+        .obi_rsp_t(obi_rsp_t)
+      ) cache_i (
+        .clk_i             (clk_i),
+        .rst_ni            (rst_ni),
+        .dma_req_i         (cache_dma_req),
+        .dma_resp_o        (cache_dma_resp),
+        .controller_req_i  (cache_ctrl_req),
+        .controller_resp_o (cache_ctrl_resp)
+      );
+    end else begin : gen_no_cache
+      assign cache_dma_resp  = '0;
+      assign cache_ctrl_resp = '0;
+    end
+  endgenerate
+
   // Registers
   w25q128jw_controller_reg_top #(
       .reg_req_t(reg_req_t),
@@ -1729,9 +1932,17 @@ module w25q128jw_controller
       .clk_i(clk_i),
       .rst_ni(rst_ni),
       .reg_req_i,
-      .reg_rsp_o,
+      .reg_rsp_o(reg_rsp_int),
       .reg2hw,
       .hw2reg,
       .devmode_i(1'b1)
   );
+
+  // If cache read requested, delay ready until cache response is valid
+  assign reg_rsp_o.ready = reg_rsp_int.ready
+                            & ~(CACHE_EN & cache_data_bus_re & ~cache_dma_resp.rvalid);
+  assign reg_rsp_o.rdata = (CACHE_EN & cache_dma_resp.rvalid & cache_data_bus_re)
+                            ? cache_rdata_aligned : reg_rsp_int.rdata;
+  assign reg_rsp_o.error = reg_rsp_int.error;
+
 endmodule
