@@ -12,22 +12,22 @@
 module cache
   import cache_reg_pkg::*;
 #(
-  parameter int unsigned SramLatency = 32'd1,
-  
-  // OBI Interface data types
-  parameter type obi_req_t = logic,
-  parameter type obi_rsp_t = logic
+    parameter int unsigned SramLatency = 32'd1,
+
+    // OBI Interface data types
+    parameter type obi_req_t = logic,
+    parameter type obi_rsp_t = logic
 ) (
-  input  logic           clk_i,
-  input  logic           rst_ni,
+    input logic clk_i,
+    input logic rst_ni,
 
-  // DMA (SLAVE) communication
-  input  obi_req_t       dma_req_i,
-  output obi_rsp_t      dma_resp_o,
+    // DMA (SLAVE) communication
+    input  obi_req_t dma_req_i,
+    output obi_rsp_t dma_resp_o,
 
-  // Controller (MASTER) communication
-  input  cache_req_t     controller_req_i,
-  output cache_res_t     controller_resp_o
+    // Controller (MASTER) communication
+    input  cache_req_t controller_req_i,
+    output cache_res_t controller_resp_o
 );
 
   // Currently implements single way cache (direct-mapped) only
@@ -35,68 +35,73 @@ module cache
 
   localparam int unsigned SramAddrWidth = $clog2(N_WORDS);
 
-  cache_op_e                          active_op_q, active_op_d;
+  cache_op_e active_op_q, active_op_d;
   logic [SECTOR_SIZE_WORDS_WIDTH-1:0] word_counter_q, word_counter_d;
 
   // Sector address registered at start of READ/WRITE
-  logic [N_SETS_WIDTH-1:0]            target_set_q, target_set_d;
-  logic [TAG_WIDTH-1:0]               target_tag_q, target_tag_d;
-  logic [SECTOR_SIZE_WORDS_WIDTH:0]   target_word_len_q, target_word_len_d; // Number of words to transfer
-  logic                               target_dirty_q, target_dirty_d; // Only valid for WRITE, indicates whether the sector being written is dirty or clean
+  logic [N_SETS_WIDTH-1:0] target_set_q, target_set_d;
+  logic [TAG_WIDTH-1:0] target_tag_q, target_tag_d;
+  logic [SECTOR_SIZE_WORDS_WIDTH:0]
+      target_word_len_q, target_word_len_d;  // Number of words to transfer
+  logic
+      target_dirty_q,
+      target_dirty_d; // Only valid for WRITE, indicates whether the sector being written is dirty or clean
 
   // Cache way(s) signals
-  logic                               hit;
-  logic                               dirty;
-  logic [SECTOR_ADDRESS_WIDTH-1:0]    victim_sector;
-  logic                               last_sector_word;
-  logic                               last_word_was_read_q, last_word_was_read_d; // To track whether the last word transferred was a read
+  logic                            hit;
+  logic                            dirty;
+  logic [SECTOR_ADDRESS_WIDTH-1:0] victim_sector;
+  logic                            last_sector_word;
+  logic
+      last_word_was_read_q,
+      last_word_was_read_d;  // To track whether the last word transferred was a read
 
   // SRAM Port signals
-  logic                               mem_req;
-  logic                               mem_we;
-  logic [SramAddrWidth-1:0]           mem_addr;
-  data_t                              mem_wdata;
-  be_t                                mem_be;
-  data_t                              mem_rdata;
+  logic                      mem_req;
+  logic                      mem_we;
+  logic  [SramAddrWidth-1:0] mem_addr;
+  data_t                     mem_wdata;
+  be_t                       mem_be;
+  data_t                     mem_rdata;
 
-  logic                               gnt;
-  logic [SramLatency-1:0]             rvalid;
+  logic                      gnt;
+  logic  [  SramLatency-1:0] rvalid;
 
   // FSM state, word counter, and target sector address
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      active_op_q       <= CACHE_IDLE;
-      word_counter_q    <= '0;
-      target_set_q      <= '0;
-      target_tag_q      <= '0;
-      target_word_len_q <= '0;
-      target_dirty_q    <= '0;
+      active_op_q          <= CACHE_IDLE;
+      word_counter_q       <= '0;
+      target_set_q         <= '0;
+      target_tag_q         <= '0;
+      target_word_len_q    <= '0;
+      target_dirty_q       <= '0;
 
       last_word_was_read_q <= 1'b0;
     end else begin
-      active_op_q       <= active_op_d;
-      word_counter_q    <= word_counter_d;
-      target_set_q      <= target_set_d;
-      target_tag_q      <= target_tag_d;
-      target_word_len_q <= target_word_len_d;
-      target_dirty_q    <= target_dirty_d;
+      active_op_q          <= active_op_d;
+      word_counter_q       <= word_counter_d;
+      target_set_q         <= target_set_d;
+      target_tag_q         <= target_tag_d;
+      target_word_len_q    <= target_word_len_d;
+      target_dirty_q       <= target_dirty_d;
 
       last_word_was_read_q <= last_word_was_read_d;
     end
   end
 
   always_comb begin
-    active_op_d       = active_op_q;
-    word_counter_d    = word_counter_q;
-    target_set_d      = target_set_q;
-    target_tag_d      = target_tag_q;
-    target_word_len_d = target_word_len_q;
-    target_dirty_d    = target_dirty_q;
+    active_op_d          = active_op_q;
+    word_counter_d       = word_counter_q;
+    target_set_d         = target_set_q;
+    target_tag_d         = target_tag_q;
+    target_word_len_d    = target_word_len_q;
+    target_dirty_d       = target_dirty_q;
 
     last_word_was_read_d = last_word_was_read_q;
 
     // Last word of the sector is being transferred in current cycle
-    last_sector_word  = (target_word_len_q == 'h1) & dma_req_i.req;
+    last_sector_word     = (target_word_len_q == 'h1) & dma_req_i.req;
     if (gnt) last_word_was_read_d = (active_op_q == CACHE_READ);
 
     if (controller_req_i.req) begin
@@ -180,45 +185,45 @@ module cache
 
   // Cache way metadata
   cache_way way (
-    .clk_i(clk_i),
-    .rst_ni(rst_ni),
+      .clk_i (clk_i),
+      .rst_ni(rst_ni),
 
-    .active_op_i(active_op_q),
-    .current_set_i(target_set_q),
-    .current_tag_i(target_tag_q),
-    .request_dirty_i(target_dirty_q),
-    .last_sector_word_i(last_sector_word),
+      .active_op_i(active_op_q),
+      .current_set_i(target_set_q),
+      .current_tag_i(target_tag_q),
+      .request_dirty_i(target_dirty_q),
+      .last_sector_word_i(last_sector_word),
 
-    .hit_o(hit),
-    .dirty_o(dirty),
-    .victim_sector_o(victim_sector)
+      .hit_o(hit),
+      .dirty_o(dirty),
+      .victim_sector_o(victim_sector)
   );
 
   // Cache data (SRAM bank)
   tc_sram #(
-    .NumWords (N_WORDS),        // Number of Words in data array
-    .DataWidth(WORD_SIZE_BITS), // Data signal width (in bits)
-    .ByteWidth(BYTE_SIZE_BITS), // Width of a data byte (in bits)
-    .NumPorts (N_WAYS),         // Number of read and write ports
-    .Latency  (SramLatency)     // Latency when the read data is available
+      .NumWords (N_WORDS),         // Number of Words in data array
+      .DataWidth(WORD_SIZE_BITS),  // Data signal width (in bits)
+      .ByteWidth(BYTE_SIZE_BITS),  // Width of a data byte (in bits)
+      .NumPorts (N_WAYS),          // Number of read and write ports
+      .Latency  (SramLatency)      // Latency when the read data is available
   ) cache_data (
-    .clk_i  (clk_i),
-    .rst_ni (rst_ni),
-    .req_i  (mem_req),
-    .we_i   (mem_we),
-    .addr_i (mem_addr),
-    .wdata_i(mem_wdata),
-    .be_i   (mem_be),
-    // output ports
-    .rdata_o(mem_rdata)
+      .clk_i  (clk_i),
+      .rst_ni (rst_ni),
+      .req_i  (mem_req),
+      .we_i   (mem_we),
+      .addr_i (mem_addr),
+      .wdata_i(mem_wdata),
+      .be_i   (mem_be),
+      // output ports
+      .rdata_o(mem_rdata)
   );
 
   // Output assignments
 
   // DMA response
-  assign dma_resp_o.gnt    = gnt;
+  assign dma_resp_o.gnt = gnt;
   assign dma_resp_o.rvalid = rvalid[SramLatency-1] & last_word_was_read_q; // rvalid is only relevant for READ operations, and we want to assert rvalid in the cycle when the last word of the sector is transferred
-  assign dma_resp_o.rdata  = mem_rdata;
+  assign dma_resp_o.rdata = mem_rdata;
 
   // Controller response
   assign controller_resp_o.hit = hit;
