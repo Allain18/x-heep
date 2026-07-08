@@ -37,7 +37,7 @@ module w25q128jw_controller
     // External DMA number of channels
     parameter int unsigned DMA_CH_NUM = 'd1,
 
-    parameter bit CACHE_EN = 1'b1,  // Set to 1 to enable cache, 0 to disable cache
+    parameter bit CACHE_EN = 1'b0,  // Set to 1 to enable cache, 0 to disable cache
 
     // Register Interface data types
     parameter type reg_req_t = logic,
@@ -653,6 +653,7 @@ module w25q128jw_controller
               dma_size_d = (({19'h0, SE_BSIZE} - {20'h0, sector_offset_q}) >> 2);
             end
 
+            // TODO: multiple sector
             if (dma_size_d != 0) begin
               // Cache request
               cache_ctrl_req.req = 1'b1;
@@ -668,9 +669,6 @@ module w25q128jw_controller
                            dma_size_d[15:0]);  // size (in words)
 
               read_cache_state_d = READ_CACHE_TRANS;
-            end else begin
-              // TODO: doesn't seem correct
-              top_state_d = TOP_DONE;
             end
           end
 
@@ -704,11 +702,6 @@ module w25q128jw_controller
         case (read_state_q)
           // -------- IDLE: Trigger DMA initialization --------
           READ_IDLE: begin
-            if (!CACHE_EN) begin
-              top_state_d       = TOP_DMA_INIT;  // Go to DMA init FSM
-              dma_init_return_d = RETURN_READ;  // Return here after DMA init
-              read_state_d      = READ_SET_DMA;  // Next state after returning from DMA init
-            end
 
             //TODO: to remove
             if (memio_state_q == MEMIO_READ) begin
@@ -760,18 +753,17 @@ module w25q128jw_controller
                                reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
                                dma_size_d[15:0]);
                 end
-              end
-              // end else begin
-              // WRITE operation: always read one sector (1024 words = 4KB)
-              dma_size_d = {19'b0, SE_WSIZE};
+              end else begin
+                // WRITE operation: always read one sector (1024 words = 4KB)
+                dma_size_d = {19'b0, SE_WSIZE};
 
-              set_dma_regs(SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET},
-                           reg2hw.s_address.q, 32'h0, 32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
-                           2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
-                           'h4, 'h0,
-                           reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
-                           dma_size_d[15:0]);
-              // end
+                set_dma_regs(SPI_FLASH_START_ADDRESS + {25'b0, SPI_HOST_RXDATA_OFFSET},
+                            reg2hw.s_address.q, 32'h0, 32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
+                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
+                            'h4, 'h0,
+                            reg2hw.dma_slot_wait_counter.q,  // slot_wait_counter to write to DMA
+                            dma_size_d[15:0]);
+              end
             end
           end
 
@@ -1014,6 +1006,9 @@ module w25q128jw_controller
                 // ===== CACHE FILLED, proceed to CHECK_CACHE (hit) =====
                 top_state_d         = TOP_CHECK_CACHE;
                 check_cache_state_d = CHECK_CACHE_HIT;
+              end else if (reg2hw.control.rnw.q) begin
+                top_state_d            = TOP_DONE;
+                dma_init_return_d      = RETURN_READ;
               end else begin
                 // ===== WRITE OPERATION: Proceed to FWAIT =====
                 top_state_d   = TOP_FWAIT;
