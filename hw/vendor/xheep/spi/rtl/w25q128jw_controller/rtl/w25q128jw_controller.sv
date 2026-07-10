@@ -362,7 +362,8 @@ module w25q128jw_controller
   logic [11:0] sector_offset_q, sector_offset_d;
   logic [12:0] sector_written_bytes_q, sector_written_bytes_d;
   logic [31:0] sector_iter_offset_d, sector_iter_offset_q;
-  logic [31:0] transfer_byte_offset_d, transfer_byte_offset_q;
+  logic [11:0] transfer_byte_offset_d, transfer_byte_offset_q;
+  logic [31:0] read_remaining_bytes_d, read_remaining_bytes_q;
   logic [31:0] spi_control_q, spi_control_d;
 
   // If cache enabled, keep in memory the victim's sector to writeback
@@ -413,7 +414,8 @@ module w25q128jw_controller
       sector_offset_q <= 12'h0;
       sector_written_bytes_q <= 13'h0;
       sector_iter_offset_q <= 32'h0;
-      transfer_byte_offset_q <= 32'h0;
+      transfer_byte_offset_q <= 12'h0;
+      read_remaining_bytes_q <= 32'h0;
       spi_control_q <= 32'h0;
       dma_size_q <= 32'h0;
       memio_addr_q <= 32'h0;
@@ -449,6 +451,7 @@ module w25q128jw_controller
       sector_written_bytes_q <= sector_written_bytes_d;
       sector_iter_offset_q <= sector_iter_offset_d;
       transfer_byte_offset_q <= transfer_byte_offset_d;
+      read_remaining_bytes_q <= read_remaining_bytes_d;
       spi_control_q <= spi_control_d;
       memio_addr_q <= memio_addr_d;
       memio_data_q <= memio_data_d;
@@ -487,6 +490,7 @@ module w25q128jw_controller
     sector_written_bytes_d = sector_written_bytes_q;
     sector_iter_offset_d = sector_iter_offset_q;
     transfer_byte_offset_d = transfer_byte_offset_q;
+    read_remaining_bytes_d = read_remaining_bytes_q;
     spi_control_d = spi_control_q;
     memio_addr_d = memio_addr_q;
     memio_data_d = memio_data_q;
@@ -538,16 +542,18 @@ module w25q128jw_controller
     //   - Write (rnw=0): TOP_IDLE -> TOP_READ -> TOP_FWAIT -> TOP_ERASE -> TOP_FWAIT ->
     //                    TOP_MODIFY -> TOP_WRITE -> TOP_FWAIT -> TOP_IDLE
     //
-    // Note that:
-    //   - Read operation is byte precise while Write operation is word precise
-    //   - meaning that, if you write 5bytes, it writes 8 bytes (round to next word size)
-    //   - this is because the MODIFY FSM (SRAM to SRAM) uses WORDs type transfers
 
     case (top_state_q)
       // -------- IDLE STATE --------
       // Wait for SW to set the START bit in CONTROL register
       TOP_IDLE: begin
         if (reg2hw.control.start.q) begin
+          read_remaining_bytes_d = reg2hw.length.q;
+          transfer_byte_offset_d = 12'h0;
+          sector_iter_offset_d = 32'h0;
+          sector_offset_d = reg2hw.f_address.q[11:0];
+          sector_written_bytes_d = 13'h0;
+
           if (CACHE_EN) begin
             // If cache enabled, first check if data is already in cache before deciding to read from flash or not
             top_state_d = TOP_CHECK_CACHE;
@@ -580,6 +586,11 @@ module w25q128jw_controller
             cache_ctrl_req.addr.exposed = {
               8'h0, (reg2hw.f_address.q + sector_iter_offset_q) & 32'h00ffffff
             };
+
+            //TODO: was 
+            //            cache_ctrl_req.addr.exposed = {
+            //   8'h0, ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q + sector_offset_q) & 32'h00ffffff
+            // };
 
             check_cache_state_d = CHECK_CACHE_RESPONSE;
           end
@@ -638,12 +649,10 @@ module w25q128jw_controller
           // -------- IDLE: Trigger DMA initialization --------
           READ_CACHE_IDLE: begin
             // Reset md_offset for first sector
-            if (sector_iter_offset_q == 32'h0) begin
-              transfer_byte_offset_d = 32'h0;
+            if (sector_iter_offset_q != 32'h0) begin
+              transfer_byte_offset_d = 12'h0;
             end
 
-            // Count number of bytes already written in this sector
-            sector_written_bytes_d = 13'h0;
 
             // Next state after returning from DMA reset
             top_state_d            = TOP_DMA_INIT;
@@ -653,26 +662,32 @@ module w25q128jw_controller
 
           READ_CACHE_REGS: begin
             // Compute how many words to transfer for this sector
-            if (reg2hw.length.q - {19'h0, sector_written_bytes_q} < {19'h0, SE_BSIZE} - {20'h0, sector_offset_q}) begin
+            if (read_remaining_bytes_q < {19'h0, SE_BSIZE} - {20'h0, sector_offset_q}) begin
               // Case 1: All remaining data fits in this sector
-              dma_size_d = (reg2hw.length.q - {19'h0, sector_written_bytes_q}) >> 2;
+              dma_size_d = (read_remaining_bytes_q) >> 2;
             end else begin
               // Case 2: Data spans multiple sectors. Fill remaining sector space
               // Transfer (4KB - offset) bytes
               dma_size_d = (({19'h0, SE_BSIZE} - {20'h0, sector_offset_q}) >> 2);
             end
 
-            // TODO: multiple sector
             if (dma_size_d != 0) begin
               // Cache request
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op = CACHE_READ;
+              // Source: read from within the cached sector starting at sector_offset.
+              // For the first sector sector_offset = f_address[11:0] (misaligned start),
+              // for subsequent sectors sector_offset = 0. The cache uses the address'
+              // byte_offset field to pick the starting word within the sector.
               cache_ctrl_req.addr.exposed = {
-                8'h0, (reg2hw.f_address.q + transfer_byte_offset_q) & 32'h00ffffff
+                8'h0, ((reg2hw.f_address.q & 32'h00fff000) + sector_iter_offset_q + {20'h0, sector_offset_q}) & 32'h00ffffff
               };
               cache_ctrl_req.word_count = dma_size_d[15:0];
 
-              set_dma_regs(CACHE_DATA_ADDR, reg2hw.s_address.q + transfer_byte_offset_q, 32'h0,
+              // Destination: RAM must stay contiguous. Total bytes already written =
+              // sector_iter_offset + sector_offset - initial misalignment (f_address[11:0]),
+              // so subtract the first-sector offset to avoid leaving a gap between sectors.
+              set_dma_regs(CACHE_DATA_ADDR, reg2hw.s_address.q + sector_iter_offset_q + {20'h0, sector_offset_q} - {20'h0, reg2hw.f_address.q[11:0]}, 32'h0,
                            32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
                            'h0, 'h0,
@@ -689,16 +704,17 @@ module w25q128jw_controller
               sector_offset_d        = sector_offset_q + (dma_size_q << 2);
               sector_written_bytes_d = sector_written_bytes_q + (dma_size_q << 2);
 
-              if (reg2hw.length.q <= {19'h0, sector_written_bytes_d}) begin
+              if (read_remaining_bytes_q <= {19'h0, sector_written_bytes_d}) begin
                 // All remaining data has been transferred at this iteration
 
                 top_state_d = TOP_DONE;
-              end else if (sector_written_bytes_d != 0 && sector_offset_d == 0) begin
+              end else if (read_remaining_bytes_q > {19'h0, sector_written_bytes_d}) begin
                 // More data remains in next sector(s): compute remaining length for next sector iteration
-                hw2reg.length.de     = 1'b1;
-                hw2reg.length.d      = reg2hw.length.q - {19'h0, sector_written_bytes_d};
+                read_remaining_bytes_d = read_remaining_bytes_q - {19'h0, sector_written_bytes_d};
 
                 sector_iter_offset_d = sector_iter_offset_q + {19'b0, SE_BSIZE};
+                sector_offset_d      = 12'h0;
+                sector_written_bytes_d = 13'h0;
 
                 top_state_d          = TOP_CHECK_CACHE;
               end
@@ -733,13 +749,13 @@ module w25q128jw_controller
             if (!CACHE_EN) begin
               // When no cache, every read request is independent, needs to reset md_offset
               if (reg2hw.control.rnw.q) begin
-                transfer_byte_offset_d = 32'h0;
+                transfer_byte_offset_d = 12'h0;
               end
             end
 
             // Reset md_offset for first sector of a new write
             if (sector_iter_offset_q == 32'h0) begin
-              transfer_byte_offset_d = 32'h0;
+              transfer_byte_offset_d = 12'h0;
             end
 
             // Next state after returning from DMA reset
@@ -1469,6 +1485,7 @@ module w25q128jw_controller
                 cache_ctrl_req.word_count = dma_size_d[15:0];
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
 
+                //TODO: achtung
                 set_dma_regs(reg2hw.md_address.q + transfer_byte_offset_q, CACHE_DATA_ADDR, 32'h4,
                              32'h0,  // src_inc=4 (word), dst_inc=0 (FIFO)
                              2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
@@ -1485,7 +1502,7 @@ module w25q128jw_controller
             end
           end
 
-          // ============== WAIT FOR DMA COMPLETION (BODY) ==============
+          // ============== WAIT FOR DMA COMPLETION ==============
           MODIFY_TRANS: begin
             if (dma_done_i[0]) begin  // DMA channel 0 done signal
               transfer_byte_offset_d = transfer_byte_offset_q + (dma_size_q << 2);
@@ -1498,7 +1515,7 @@ module w25q128jw_controller
               if (reg2hw.length.q <= {19'h0, sector_written_bytes_d}) begin
                 // All remaining data has been transferred at this iteration: set length to 0 and reset md_offset
                 hw2reg.length.d = 32'h0;
-                transfer_byte_offset_d = 32'h0;
+                transfer_byte_offset_d = 12'h0;
 
                 if (CACHE_EN) begin
                   // Finish if cache enabled
@@ -1891,7 +1908,10 @@ module w25q128jw_controller
 
       TOP_DONE: begin
         transfer_byte_offset_d = 32'h0;
+        read_remaining_bytes_d = 32'h0;
         sector_iter_offset_d = 32'h0;
+        sector_offset_d = 12'h0;
+        sector_written_bytes_d = 13'h0;
 
         hw2reg.control.start.de = 1'b1;
         hw2reg.control.start.d  = 1'b0;
