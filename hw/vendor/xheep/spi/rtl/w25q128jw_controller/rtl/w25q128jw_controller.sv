@@ -37,7 +37,7 @@ module w25q128jw_controller
     // External DMA number of channels
     parameter int unsigned DMA_CH_NUM = 'd1,
 
-    parameter bit CACHE_EN = 1'b0,  // Set to 1 to enable cache, 0 to disable cache
+    parameter bit CACHE_EN = 1'b1,  // Set to 1 to enable cache, 0 to disable cache
 
     // Register Interface data types
     parameter type reg_req_t = logic,
@@ -637,6 +637,11 @@ module w25q128jw_controller
 
           // -------- IDLE: Trigger DMA initialization --------
           READ_CACHE_IDLE: begin
+            // Reset md_offset for first sector
+            if (sector_iter_offset_q == 32'h0) begin
+              transfer_byte_offset_d = 32'h0;
+            end
+
             // Count number of bytes already written in this sector
             sector_written_bytes_d = 13'h0;
 
@@ -662,10 +667,12 @@ module w25q128jw_controller
               // Cache request
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op = CACHE_READ;
-              cache_ctrl_req.addr.exposed = {8'h0, reg2hw.f_address.q & 32'h00ffffff};
+              cache_ctrl_req.addr.exposed = {
+                8'h0, (reg2hw.f_address.q + transfer_byte_offset_q) & 32'h00ffffff
+              };
               cache_ctrl_req.word_count = dma_size_d[15:0];
 
-              set_dma_regs(CACHE_DATA_ADDR, reg2hw.s_address.q, 32'h0,
+              set_dma_regs(CACHE_DATA_ADDR, reg2hw.s_address.q + transfer_byte_offset_q, 32'h0,
                            32'h4,  // src_inc=0 (FIFO), dst_inc=4 (word)
                            2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
                            'h0, 'h0,
@@ -678,13 +685,24 @@ module w25q128jw_controller
 
           READ_CACHE_TRANS: begin
             if (dma_done_i[0]) begin
+              transfer_byte_offset_d = transfer_byte_offset_q + (dma_size_q << 2);
               sector_offset_d        = sector_offset_q + (dma_size_q << 2);
               sector_written_bytes_d = sector_written_bytes_q + (dma_size_q << 2);
 
-              // Next state after returning from DMA reset
-              top_state_d            = TOP_DONE;
-              // dma_init_return_d  = RETURN_READ_CACHE;
-              read_cache_state_d     = READ_CACHE_IDLE;
+              if (reg2hw.length.q <= {19'h0, sector_written_bytes_d}) begin
+                // All remaining data has been transferred at this iteration
+
+                top_state_d = TOP_DONE;
+              end else if (sector_written_bytes_d != 0 && sector_offset_d == 0) begin
+                // More data remains in next sector(s): compute remaining length for next sector iteration
+                hw2reg.length.de     = 1'b1;
+                hw2reg.length.d      = reg2hw.length.q - {19'h0, sector_written_bytes_d};
+
+                sector_iter_offset_d = sector_iter_offset_q + {19'b0, SE_BSIZE};
+
+                top_state_d          = TOP_CHECK_CACHE;
+              end
+              read_cache_state_d = READ_CACHE_IDLE;
             end
           end
 
@@ -1017,6 +1035,9 @@ module w25q128jw_controller
             //TODO: I think it's only for write, need to do for read
             if (dma_done_i[0]) begin  // DMA channel 0 done signal
               read_state_d = READ_IDLE;
+              if (reg2hw.control.rnw.q) begin
+                transfer_byte_offset_d = transfer_byte_offset_q + (dma_size_q << 2);
+              end
 
               if (CACHE_EN) begin
                 // ===== CACHE FILLED, proceed to CHECK_CACHE (hit) =====
@@ -1477,6 +1498,7 @@ module w25q128jw_controller
               if (reg2hw.length.q <= {19'h0, sector_written_bytes_d}) begin
                 // All remaining data has been transferred at this iteration: set length to 0 and reset md_offset
                 hw2reg.length.d = 32'h0;
+                transfer_byte_offset_d = 32'h0;
 
                 if (CACHE_EN) begin
                   // Finish if cache enabled
@@ -1868,6 +1890,7 @@ module w25q128jw_controller
       end
 
       TOP_DONE: begin
+        transfer_byte_offset_d = 32'h0;
         sector_iter_offset_d = 32'h0;
 
         hw2reg.control.start.de = 1'b1;
