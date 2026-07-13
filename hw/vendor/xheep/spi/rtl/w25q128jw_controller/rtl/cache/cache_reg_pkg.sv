@@ -32,7 +32,7 @@ package cache_reg_pkg;
   parameter int N_WORDS = N_SETS * SECTOR_SIZE_WORDS;
 
   parameter type data_t = logic [WORD_SIZE_BITS-1:0];
-  parameter type be_t   = logic [((WORD_SIZE_BITS + BYTE_SIZE_BITS - 1'd1) / BYTE_SIZE_BITS)-1:0]; // ceil_div
+  parameter type be_t   = logic [(WORD_SIZE_BITS / BYTE_SIZE_BITS)-1:0];
 
   typedef union packed {
     logic [ADDR_WIDTH-1:0] exposed;
