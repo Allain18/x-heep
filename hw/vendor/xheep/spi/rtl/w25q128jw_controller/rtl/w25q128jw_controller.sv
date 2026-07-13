@@ -283,10 +283,12 @@ module w25q128jw_controller
   // -------- MODIFY FSM STATES --------
   // Copies new data into the sector buffer (RAM) at the correct offset
   // Uses DMA to transfer from ram_new_data to ram_buffer (or from cache if enabled)
-  typedef enum logic [1:0] {
+  typedef enum logic [2:0] {
     MODIFY_IDLE,  // Leads to DMA initialization
     MODIFY_REGS, // Set the DMA registers (ram_new_data + offset (which sector we are now looking to write into + F_ADDRESS sector misalignment))
-    MODIFY_TRANS  // Wait for DMA transfer complete and update offsets + remaining length to write
+    MODIFY_TRANS,  // Wait for DMA transfer complete and update offsets + remaining length to write
+    MODIFY_MEMIO_REQ,
+    MODIFY_MEMIO
   } modify_state_e;
 
   // -------- WRITE FSM STATES --------
@@ -671,7 +673,6 @@ module w25q128jw_controller
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op = CACHE_READ;
               cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
-              cache_ctrl_req.word_count = 'h1;
 
               read_cache_state_d = READ_CACHE_MEMIO_REQ;
             end
@@ -755,7 +756,7 @@ module w25q128jw_controller
             memio_addr_d = 'h0;
             memio_be_d = 4'h0;
             read_cache_state_d = READ_CACHE_IDLE;
-            top_state_d = TOP_IDLE;
+            top_state_d = TOP_DONE;
           end
 
 
@@ -1081,7 +1082,6 @@ module w25q128jw_controller
 
           // ============== WAIT FOR DMA COMPLETION ==============
           READ_TRANS: begin
-            //TODO: I think it's only for write, need to do for read
             if (dma_done_i[0]) begin  // DMA channel 0 done signal
               read_state_d = READ_IDLE;
               if (reg2hw.control.rnw.q) begin
@@ -1476,20 +1476,29 @@ module w25q128jw_controller
         case (modify_state_q)
           // -------- IDLE: Trigger DMA initialization --------
           MODIFY_IDLE: begin
-            // Compute sector offset
-            if (sector_iter_offset_q == 0) begin
-              sector_offset_d = reg2hw.f_address.q[11:0]; // Offset within sector for first iteration
-            end else begin
-              sector_offset_d = 12'h0;  // Begin from start of sector for next iterations
+            if (memio_state_q == MEMIO_IDLE) begin
+              // Compute sector offset
+              if (sector_iter_offset_q == 0) begin
+                sector_offset_d = reg2hw.f_address.q[11:0]; // Offset within sector for first iteration
+              end else begin
+                sector_offset_d = 12'h0;  // Begin from start of sector for next iterations
+              end
+
+              // Count number of bytes already written in this sector
+              sector_written_bytes_d = 13'h0;
+
+              top_state_d            = TOP_DMA_INIT;
+              dma_init_return_d      = RETURN_MODIFY;
+
+              modify_state_d         = MODIFY_REGS;
+            end else if (CACHE_EN) begin //MEMIO
+              cache_ctrl_req.req = 1'b1;
+              cache_ctrl_req.op = CACHE_WRITE;
+              cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
+              cache_ctrl_req.dirty = 1'b1;
+
+              modify_state_d = MODIFY_MEMIO_REQ;
             end
-
-            // Count number of bytes already written in this sector
-            sector_written_bytes_d = 13'h0;
-
-            top_state_d            = TOP_DMA_INIT;
-            dma_init_return_d      = RETURN_MODIFY;
-
-            modify_state_d         = MODIFY_REGS;
           end
 
           // ============== DMA CONFIGURATION ==============
@@ -1518,7 +1527,6 @@ module w25q128jw_controller
                 cache_ctrl_req.word_count = dma_size_d[15:0];
                 cache_ctrl_req.dirty = 1'b1;  // Mark line as dirty since we're modifying it
 
-                //TODO: achtung
                 set_dma_regs(reg2hw.md_address.q + transfer_byte_offset_q, CACHE_DATA_ADDR, 32'h4,
                              32'h0,  // src_inc=4 (word), dst_inc=0 (FIFO)
                              2'h0, 2'h0,  // src_data_type=32-bit, dst_data_type=32-bit
@@ -1575,6 +1583,22 @@ module w25q128jw_controller
 
               modify_state_d = MODIFY_IDLE;
             end
+          end
+
+          MODIFY_MEMIO_REQ: begin
+            cache_req = 1'b1;
+            modify_state_d = MODIFY_MEMIO;
+          end
+
+          MODIFY_MEMIO: begin
+            spimemio_resp_o.rdata = memio_data_q;
+            spimemio_resp_o.rvalid = 1'b1;
+
+            // Clear memio flag and finish transaction
+            memio_state_d = MEMIO_IDLE;
+            memio_be_d = 4'h0;
+            modify_state_d = MODIFY_IDLE;
+            top_state_d = TOP_DONE;
           end
 
           default: begin
@@ -2012,6 +2036,8 @@ module w25q128jw_controller
           .controller_req_i (cache_ctrl_req),
           .controller_resp_o(cache_ctrl_resp),
           .mem_man_req      (cache_req),
+          .memio_wdata      (memio_data_q),
+          .memio_be         (memio_be_q),
           .mem_rdata        (cache_rdata)
       );
     end else begin : gen_no_cache

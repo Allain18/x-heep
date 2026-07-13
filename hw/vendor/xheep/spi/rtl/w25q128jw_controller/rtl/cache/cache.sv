@@ -30,6 +30,8 @@ module cache
     output cache_res_t controller_resp_o,
 
     input  logic  mem_man_req,
+    input  be_t   memio_be,
+    input  data_t memio_wdata,
     output data_t mem_rdata
 );
 
@@ -65,7 +67,6 @@ module cache
   logic  [SramAddrWidth-1:0] mem_addr;
   data_t                     mem_wdata;
   be_t                       mem_be;
-  // data_t                     mem_rdata;
 
   logic                      gnt;
   logic  [  SramLatency-1:0] rvalid;
@@ -177,8 +178,8 @@ module cache
           mem_req   = 1'b1;
           mem_we    = 1'b1;
           mem_addr  = SramAddrWidth'({target_set_q, word_counter_q});
-          mem_wdata = dma_req_i.wdata;
-          mem_be    = dma_req_i.be;
+          mem_wdata = memio_wdata;
+          mem_be    = memio_be;
         end
 
         CACHE_READ: begin
