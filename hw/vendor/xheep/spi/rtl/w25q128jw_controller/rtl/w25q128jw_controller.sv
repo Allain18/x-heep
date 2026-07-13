@@ -522,9 +522,6 @@ module w25q128jw_controller
     hw2reg.intr_status.de   = 1'b0;
     hw2reg.intr_status.d    = 1'b0;
 
-    hw2reg.address_memio_write.de = 1'b0;
-    hw2reg.address_memio_write.d = 32'h0;
-
     external_dma_hw2reg_o   = '0;
 
     flash_address = '0;
