@@ -27,7 +27,10 @@ module cache
 
     // Controller (MASTER) communication
     input  cache_req_t controller_req_i,
-    output cache_res_t controller_resp_o
+    output cache_res_t controller_resp_o,
+
+    input  logic  mem_man_req,
+    output data_t mem_rdata
 );
 
   // Currently implements single way cache (direct-mapped) only
@@ -62,7 +65,7 @@ module cache
   logic  [SramAddrWidth-1:0] mem_addr;
   data_t                     mem_wdata;
   be_t                       mem_be;
-  data_t                     mem_rdata;
+  // data_t                     mem_rdata;
 
   logic                      gnt;
   logic  [  SramLatency-1:0] rvalid;
@@ -164,6 +167,25 @@ module cache
           mem_we   = 1'b0;
           mem_addr = SramAddrWidth'({target_set_q, word_counter_q});
           mem_be   = dma_req_i.be;
+        end
+
+        default: ;
+      endcase
+    end else if (mem_man_req) begin
+      unique case (active_op_q)
+        CACHE_WRITE: begin
+          mem_req   = 1'b1;
+          mem_we    = 1'b1;
+          mem_addr  = SramAddrWidth'({target_set_q, word_counter_q});
+          mem_wdata = dma_req_i.wdata;
+          mem_be    = dma_req_i.be;
+        end
+
+        CACHE_READ: begin
+          mem_req  = 1'b1;
+          mem_we   = 1'b0;
+          mem_addr = SramAddrWidth'({target_set_q, word_counter_q});
+          mem_be   = 4'hf;
         end
 
         default: ;
