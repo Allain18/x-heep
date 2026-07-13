@@ -39,7 +39,7 @@ int main(void)
     uint8_t v8;
     uintptr_t base = FLASH_MEM_START_ADDRESS; // Base address for memory-mapped SPI flash
 
-    uint32_t data_write_buffer[4] = {0x9, 0x21, 0x43, 0x65};
+    uint32_t data_write_buffer[4] = {0x9, 0x21, 0x43, 0xB7};
 
     spi_host_t* spi;
     spi = spi_flash;
@@ -58,10 +58,14 @@ int main(void)
 
 
     PRINTF("Write flash with controller...\n");
-    w25q128jw_controller_write((void*)flash_addr, (void*)data_write_buffer, 16, 0);
-    while(!w25q128jw_controller_is_ready_polling());
 
-    w25q128jw_set_buffer();
+    // Mandatory
+    dma_set_hw_configuration_mode(1,0);
+
+    // w25q128jw_controller_write((void*)flash_addr, (void*)data_write_buffer, 16, 0, 0);
+    // while(!w25q128jw_controller_is_ready_polling());
+
+
     PRINTF("Write obi word...\n");
     PRINTF("Write result should be 0x12345678u: 0x%x\n", ptr32[0] = 0x12345678u);
 
