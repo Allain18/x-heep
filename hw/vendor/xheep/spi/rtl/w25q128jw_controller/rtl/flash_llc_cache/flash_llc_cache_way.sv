@@ -11,7 +11,7 @@
 // Author: Patrick Pataky     <patrick.pataky@epfl.ch>
 //                            <patdb10@gmail.com>
 
-module cache_way
+module flash_llc_cache_way
   import flash_llc_cache_reg_pkg::*;
 (
     input logic clk_i,

@@ -20,7 +20,7 @@
 module w25q128jw_controller
   import dma_reg_pkg::*;
   import spi_host_reg_pkg::*;
-  import cache_reg_pkg::*;
+  import flash_llc_cache_reg_pkg::*;
 #(
     // SPI host memory address
     parameter logic [31:0] SPI_FLASH_START_ADDRESS = 'h0,
@@ -106,8 +106,13 @@ module w25q128jw_controller
   PAGE_WSIZE = 13'h40,  // Page size in words
   PAGE_BSIZE = 13'h100;  // Page size in bytes
 
+`ifdef CACHE_EN
   localparam logic [31:0] CACHE_DATA_ADDR = W25Q128JW_CONTROLLER_START_ADDRESS
                             + {{(32-w25q128jw_controller_reg_pkg::BlockAw){1'b0}}, W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET};
+`else
+  localparam logic [31:0] CACHE_DATA_ADDR = '0;
+`endif
+
 
   // ============== BYTE SWAP FUNCTION ==============
   function automatic [31:0] bitfield_byteswap32(input [31:0] adress_to_swap);
@@ -376,15 +381,15 @@ module w25q128jw_controller
 
   logic [31:0] dma_size_q, dma_size_d;
 
-  logic                      [31:0] flash_address;
+  logic       [31:0] flash_address;
 
   // Cache signals
-  cache_reg_pkg::cache_req_t        cache_ctrl_req;
-  cache_reg_pkg::cache_res_t        cache_ctrl_resp;
-  obi_req_t                         cache_dma_req;
-  obi_rsp_t                         cache_dma_resp;
-  logic                             cache_req;
-  data_t                            cache_rdata;
+  cache_req_t        cache_ctrl_req;
+  cache_res_t        cache_ctrl_resp;
+  obi_req_t          cache_dma_req;
+  obi_rsp_t          cache_dma_resp;
+  logic              cache_req;
+  data_t             cache_rdata;
   logic cache_data_bus_we, cache_data_bus_re;
 
   // Intermediate signals
@@ -1992,36 +1997,38 @@ module w25q128jw_controller
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
 
+`ifdef CACHE_EN
   // Forward cache SRAM read data to the CACHE_DATA register so DMA can read it
   assign hw2reg.cache_data.de = CACHE_EN & cache_dma_resp.rvalid;
-  assign hw2reg.cache_data.d = cache_dma_resp.rdata;
+  assign hw2reg.cache_data.d  = cache_dma_resp.rdata;
+`endif
 
   // ============== CACHE INSTANTIATION ==============
   always_comb begin
-    if (CACHE_EN) begin
-      cache_data_bus_we = reg_req_i.valid
+`ifdef CACHE_EN
+    cache_data_bus_we = reg_req_i.valid
                             & reg_req_i.write
                             & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
-      cache_data_bus_re = reg_req_i.valid
+    cache_data_bus_re = reg_req_i.valid
                             & ~reg_req_i.write
                             & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
 
-      cache_dma_req = '0;
+    cache_dma_req = '0;
 
-      if (cache_data_bus_we) begin
-        cache_dma_req.req   = 1'b1;
-        cache_dma_req.we    = 1'b1;
-        cache_dma_req.wdata = reg_req_i.wdata;
-        cache_dma_req.be    = reg_req_i.wstrb;
-      end else if (cache_data_bus_re && !cache_dma_resp.rvalid) begin
-        cache_dma_req.req = 1'b1;
-        cache_dma_req.we  = 1'b0;
-      end
-    end else begin
-      cache_data_bus_we = 1'b0;
-      cache_data_bus_re = 1'b0;
-      cache_dma_req = '0;
+    if (cache_data_bus_we) begin
+      cache_dma_req.req   = 1'b1;
+      cache_dma_req.we    = 1'b1;
+      cache_dma_req.wdata = reg_req_i.wdata;
+      cache_dma_req.be    = reg_req_i.wstrb;
+    end else if (cache_data_bus_re && !cache_dma_resp.rvalid) begin
+      cache_dma_req.req = 1'b1;
+      cache_dma_req.we  = 1'b0;
     end
+`else
+    cache_data_bus_we = 1'b0;
+    cache_data_bus_re = 1'b0;
+    cache_dma_req = '0;
+`endif
   end
 
   generate
