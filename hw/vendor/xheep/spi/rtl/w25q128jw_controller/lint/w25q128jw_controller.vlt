@@ -28,10 +28,3 @@ lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Bits of si
 lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Bits of signal are not used: 'rx_trigger_slot'*"
 lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Bits of signal are not used: 'tx_trigger_slot'*"
 lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Bits of signal are not used: 'cache_dma_resp'*"
-
-
-lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Bits of signal are not used: 'slot_wait_counter'*"
-lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Signal is not used: 'quad_select'*"
-lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Signal is not used: 'spimemio_req_i'*"
-lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Signal is not used: 'cache_dma_req'*"
-lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Signal is not used: 'cache_ctrl_req'*"

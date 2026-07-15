@@ -17,15 +17,6 @@
  *                                   <alaingirardvd@gmail.com>
  */
 
-
-
-`ifdef VERILATOR
-localparam QUAD_AVAILABLE = 0;
-`else
-localparam QUAD_AVAILABLE = 1;
-`endif
-
-
 module w25q128jw_controller
   import dma_reg_pkg::*;
   import spi_host_reg_pkg::*;
@@ -90,6 +81,12 @@ module w25q128jw_controller
   localparam logic [1:0] SPI_SPEED_QUAD = 2'h2;
 
   localparam logic [23:0] SPI_DUMMY_CYCLES_WAIT = 24'h03;
+
+`ifdef VERILATOR
+  localparam QUAD_AVAILABLE = 0;
+`else
+  localparam QUAD_AVAILABLE = 1;
+`endif
 
   // FLASH COMMANDS
   localparam logic [12:0] FC_RD = 13'h03,  // Read Data
@@ -478,7 +475,7 @@ module w25q128jw_controller
   assign spi_host_reg_req_o.addr = SPI_FLASH_START_ADDRESS + {{(32 - spi_host_reg_pkg::BlockAw){1'b0}}, spi_host_reg_req_offset};
 
   logic quad_select;
-  assign quad_select = reg2hw.control.quad.q & QUAD_AVAILABLE;
+  assign quad_select = (reg2hw.control.quad.q && QUAD_AVAILABLE) || (memio_state_q != MEMIO_IDLE && QUAD_AVAILABLE);
 
   // FSM combinational logic
   always_comb begin
@@ -860,7 +857,7 @@ module w25q128jw_controller
             // See hw/vendor/lowrisc_opentitan_spi_host/data/spi_host.hjson for status register bit mapping
             // See hw/vendor/lowrisc_opentitan_spi_host/rtl/spi_host_reg_pkg.sv for TXQD depth definition
             if (external_spi_host_hw2reg_status_i.txqd.d < SPI_FLASH_TX_FIFO_DEPTH[7:0]) begin
-              read_state_d = reg2hw.control.quad.q ? READ_SPI_SEND_CMD_1_QUAD : READ_SPI_FILL_TX_FIFO;
+              read_state_d = quad_select ? READ_SPI_SEND_CMD_1_QUAD : READ_SPI_FILL_TX_FIFO;
             end
           end
 
@@ -1491,7 +1488,7 @@ module w25q128jw_controller
               dma_init_return_d      = RETURN_MODIFY;
 
               modify_state_d         = MODIFY_REGS;
-            end else if (CACHE_EN) begin //MEMIO
+            end else if (CACHE_EN) begin  //MEMIO
               cache_ctrl_req.req = 1'b1;
               cache_ctrl_req.op = CACHE_WRITE;
               cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
@@ -1702,7 +1699,7 @@ module w25q128jw_controller
                     ({28'h0, page_cnt_q} << 8);
             end
 
-            if (reg2hw.control.quad.q) begin
+            if (quad_select) begin
               spi_host_reg_req_o.wdata = (bitfield_byteswap32(flash_address) & 32'hffffff00) |
                   {19'h0, FC_PPQ};
             end else begin
@@ -1804,7 +1801,7 @@ module w25q128jw_controller
             spi_host_reg_req_o.valid = 1'b1;
             spi_host_reg_req_o.wdata = spi_cmd_pack(
               SPI_DIR_TX,
-              reg2hw.control.quad.q ? SPI_SPEED_QUAD : SPI_SPEED_STD,
+              quad_select ? SPI_SPEED_QUAD : SPI_SPEED_STD,
               1'b0,
               {
                 11'b0, PAGE_BSIZE - 1'h1
