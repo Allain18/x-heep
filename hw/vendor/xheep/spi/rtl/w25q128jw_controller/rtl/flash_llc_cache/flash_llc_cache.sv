@@ -61,7 +61,7 @@ module flash_llc_cache
       last_word_was_read_q,
       last_word_was_read_d;  // To track whether the last word transferred was a read
 
-  // SRAM Port signals
+  // Cache Port signals
   logic                      mem_req;
   logic                      mem_we;
   logic  [SramAddrWidth-1:0] mem_addr;
@@ -145,7 +145,7 @@ module flash_llc_cache
     end
   end
 
-  // SRAM Accesses
+  // Cache Accesses
   always_comb begin
     mem_req   = 1'b0;
     mem_we    = 1'b0;
@@ -194,7 +194,7 @@ module flash_llc_cache
     end
   end
 
-  // SRAM valid signal
+  // Cache valid signal
   // - grand only when the new operation is registered
   assign gnt = dma_req_i.req & ((active_op_q == CACHE_READ) | (active_op_q == CACHE_WRITE));
 
