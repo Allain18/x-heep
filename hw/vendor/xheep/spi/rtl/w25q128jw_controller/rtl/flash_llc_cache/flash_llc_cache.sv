@@ -9,8 +9,8 @@
 // Author: Patrick Pataky     <patrick.pataky@epfl.ch>
 //                            <patdb10@gmail.com>
 
-module cache
-  import cache_reg_pkg::*;
+module flash_llc_cache
+  import flash_llc_cache_reg_pkg::*;
 #(
     parameter int unsigned SramLatency = 32'd1,
 
@@ -207,7 +207,7 @@ module cache
   end
 
   // Cache way metadata
-  cache_way way (
+  flash_llc_cache_way way (
       .clk_i (clk_i),
       .rst_ni(rst_ni),
 

@@ -12,7 +12,7 @@
 //                            <patdb10@gmail.com>
 
 module cache_way
-  import cache_reg_pkg::*;
+  import flash_llc_cache_reg_pkg::*;
 (
     input logic clk_i,
     input logic rst_ni,

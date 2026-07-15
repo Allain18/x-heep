@@ -2026,10 +2026,10 @@ module w25q128jw_controller
 
   generate
     if (CACHE_EN) begin : gen_cache
-      cache #(
+      flash_llc_cache #(
           .obi_req_t(obi_req_t),
           .obi_rsp_t(obi_rsp_t)
-      ) cache_i (
+      ) flash_llc_cache_i (
           .clk_i            (clk_i),
           .rst_ni           (rst_ni),
           .dma_req_i        (cache_dma_req),
@@ -2042,7 +2042,7 @@ module w25q128jw_controller
           .mem_rdata        (cache_rdata)
       );
     end else begin : gen_no_cache
-      assign cache_dma_resp  = '0;
+      assign cache_dma_resp = '0;
       assign cache_ctrl_resp = '0;
       assign cache_rdata = '0;
     end
