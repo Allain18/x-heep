@@ -291,7 +291,7 @@ class XHeep:
 
         # Check that each peripheral domain is valid
         if self.are_base_peripherals_configured():
-            self._base_peripheral_domain.validate()
+            self._base_peripheral_domain.validate(self._bus_type)
         if self.are_user_peripherals_configured():
             self._user_peripheral_domain.validate()
 

@@ -1,3 +1,4 @@
+from bus_type import BusType
 from ..abstractions import BasePeripheral
 
 
@@ -26,3 +27,11 @@ class W25Q128JW_Controller(BasePeripheral):
         """
 
         return self._cache
+
+    def validate(self, bus_type: BusType = None):
+        """
+        Validate the W25Q128JW controller peripheral. Cache needs NtoM bus type to be enabled.
+        :param BusType bus_type: The bus type of the peripheral domain.
+        """
+        if self._cache and bus_type != BusType.NtoM:
+            raise ValueError("Cache parameter can only be enabled for NtoM bus type")
