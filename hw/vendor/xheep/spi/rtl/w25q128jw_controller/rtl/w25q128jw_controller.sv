@@ -28,8 +28,6 @@ module w25q128jw_controller
     // External DMA number of channels
     parameter int unsigned DMA_CH_NUM = 'd1,
 
-    parameter bit CACHE_EN = 1'b1,  // Set to 1 to enable cache, 0 to disable cache
-
     // Register Interface data types
     parameter type reg_req_t = logic,
     parameter type reg_rsp_t = logic,
@@ -81,6 +79,12 @@ module w25q128jw_controller
   localparam logic [1:0] SPI_SPEED_QUAD = 2'h2;
 
   localparam logic [23:0] SPI_DUMMY_CYCLES_WAIT = 24'h03;
+
+`ifdef CACHE_EN
+  localparam CACHE_EN = 1;
+`else
+  localparam CACHE_EN = 0;
+`endif
 
 `ifdef VERILATOR
   localparam QUAD_AVAILABLE = 0;
@@ -2040,6 +2044,7 @@ module w25q128jw_controller
     end else begin : gen_no_cache
       assign cache_dma_resp  = '0;
       assign cache_ctrl_resp = '0;
+      assign cache_rdata = '0;
     end
   endgenerate
 

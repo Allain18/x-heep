@@ -11,6 +11,7 @@ from .base_peripherals import (
     RV_timer_ao,
     Fast_intr_ctrl,
     Ext_peripheral,
+    W25Q128JW_Controller,
     Pad_control,
     GPIO_ao,
 )
@@ -129,6 +130,19 @@ class BasePeripheralDomain(PeripheralDomain):
                 return p
 
         raise ValueError("No Power_manager peripheral found")
+
+    def get_W25Q128JW_controller(self):
+        """
+        Get the W25Q128JW_Controller peripheral.
+
+        :return: The W25Q128JW_Controller peripheral.
+        :rtype: W25Q128JW_Controller
+        """
+        for p in self._peripherals:
+            if isinstance(p, W25Q128JW_Controller):
+                return p
+
+        raise ValueError("No W25Q128JW_Controller peripheral found")
 
     def validate(self):
         """

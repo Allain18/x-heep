@@ -22,6 +22,11 @@ filesets:
     - rtl/w25q128jw_controller.sv
     file_type: systemVerilogSource
 
+  headers:
+    files:
+    - data/w25q128jw_controller.svh: { is_include_file: true }
+    file_type: systemVerilogSource
+
   files_verilator_waiver:
     files:
       - lint/w25q128jw_controller.vlt
@@ -42,6 +47,7 @@ targets:
   default:
     filesets:
     - files_rtl
+    - headers
     - tool_verilator ? (files_verilator_waiver)
     generate:
     - w25q128jw_controller
