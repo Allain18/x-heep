@@ -1981,6 +1981,8 @@ module w25q128jw_controller
         hw2reg.control.start.d  = 1'b0;
         hw2reg.intr_status.de   = 1'b1;
         hw2reg.intr_status.d    = reg2hw.intr_enable.q;
+        hw2reg.length.de = 1'b1;
+        hw2reg.length.de = '0;
 
         top_state_d = TOP_IDLE;
       end
