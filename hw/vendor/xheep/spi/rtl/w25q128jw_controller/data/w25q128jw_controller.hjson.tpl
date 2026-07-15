@@ -1,3 +1,12 @@
+// Copyright EPFL contributors.
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
+<% 
+    w25 = xheep.get_base_peripheral_domain().get_W25Q128JW_controller()
+    cache = w25.get_cache()
+%>
+
 { name: "w25q128jw_controller"
   clock_primary: "clk_i"
   bus_interfaces: [
@@ -86,6 +95,7 @@
         { bits: "7:0", name: "DMA_SLOT_WAIT_COUNTER", desc: "A DMA counter used to wait before submitting the next req when using slots"}
       ]
     }
+    % if cache:
     {
       name:    "CACHE_DATA"
       desc:    "Cache data port, used to read from/write to the DMA buffer"
@@ -95,5 +105,6 @@
         { bits: "31:0", name: "CACHE_DATA", desc: "Cache data port, used to read from/write to the DMA buffer" }
       ]
     }
+    % endif
   ]
 }
