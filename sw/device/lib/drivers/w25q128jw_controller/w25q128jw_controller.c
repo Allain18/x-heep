@@ -83,6 +83,11 @@ void w25q128jw_controller_enable_interrupt(uint32_t intr_enable)
    }
 }
 
+uint32_t w25q128jw_controller_get_cache_available(void)
+{
+    return ( w25q128jw_controller_peri->STATUS & (1<<W25Q128JW_CONTROLLER_STATUS_CACHE_BIT) );
+}
+
 __attribute__((weak, optimize("O0"))) void handler_irq_w25q128jw_controller(uint32_t id)
 {
  // Replace this function with a non-weak implementation

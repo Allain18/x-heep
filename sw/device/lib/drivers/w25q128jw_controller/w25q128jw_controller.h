@@ -75,6 +75,11 @@ void w25q128jw_controller_clear_status_register();
  */
 void w25q128jw_controller_enable_interrupt(uint32_t intr_enable);
 
+/**
+ * Cache available (1 available, 0 not available).
+ */
+uint32_t w25q128jw_controller_get_cache_available(void);
+
 // ============== OPERATION ==============
 /**
  * @param dest Pointer to the on-chip SRAM

@@ -494,6 +494,13 @@ module w25q128jw_controller
   logic quad_select;
   assign quad_select = (reg2hw.control.quad.q && QUAD_AVAILABLE) || (memio_state_q != MEMIO_IDLE && QUAD_AVAILABLE);
 
+  assign hw2reg.status.cache.de = 1'b1;
+`ifdef CACHE_EN_def
+  assign hw2reg.status.cache.d = 1'b1;
+`else 
+  assign hw2reg.status.cache.d = 1'b0;
+`endif
+
   // FSM combinational logic
   always_comb begin
     dma_init_state_d = dma_init_state_q;
@@ -2002,8 +2009,8 @@ module w25q128jw_controller
   end
 
   // Assignments
-  assign hw2reg.status.d = (top_state_q == TOP_IDLE); // READY = 1 when TOP FSM is in IDLE state, 0 otherwise
-  assign hw2reg.status.de = 1'b1;  // Always update status register
+  assign hw2reg.status.ready.d = (top_state_q == TOP_IDLE); // READY = 1 when TOP FSM is in IDLE state, 0 otherwise
+  assign hw2reg.status.ready.de = 1'b1;  // Always update status register
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
 

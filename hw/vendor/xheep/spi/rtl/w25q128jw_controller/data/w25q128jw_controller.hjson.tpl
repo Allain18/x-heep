@@ -32,9 +32,10 @@
 
     { name: "STATUS"
       desc: "Status register for flash controller"
-      swaccess: "rw"
+      swaccess: "ro"
       hwaccess: "hrw"
       fields: [
+        { bits: "1", name: "CACHE", desc: "Cache available", resval: "0x0" }
         { bits: "0", name: "READY", desc: "Ready for new operation", resval: "0x0" }
       ]
     }
