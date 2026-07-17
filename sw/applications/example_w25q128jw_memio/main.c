@@ -57,15 +57,15 @@ int main(void)
         heep_data_address = (uint32_t*)((uint32_t)(base) + (uint32_t)(heep_data_address));
     }
 
-    // Mandatory
-    dma_set_hw_configuration_mode(1,0);
-
     PRINTF("Memory-mapped SPI flash test\n");
 
     PRINTF("Write bytes at sector 0...\n");
     // Using the controller to write data from SRAM to flash
     w25q128jw_controller_write(flash_source_pattern, (void*)data_sram, NUM_BYTES, 0, 1);
     while(!w25q128jw_controller_is_ready_polling());
+
+    // Mandatory because w25q128jw_controller_is_ready_polling reset it
+    dma_set_hw_configuration_mode(1,0);
 
     PRINTF("Read obi words at sector 0...\n");
     for(int i = 0; i < NUM_WORDS; i++) {
