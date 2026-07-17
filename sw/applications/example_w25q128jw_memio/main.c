@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "core_v_mini_mcu.h"
 #include "x-heep.h"
 #include "w25q128jw.h"
@@ -36,7 +37,7 @@ int main(void)
     uint32_t v32;
     uint16_t v16;
     uint8_t v8;
-    uintptr_t *base = FLASH_MEM_START_ADDRESS; // Base address for memory-mapped SPI flash
+    uintptr_t *base = (uintptr_t *)FLASH_MEM_START_ADDRESS; // Base address for memory-mapped SPI flash
 
     spi_host_t* spi;
     spi = spi_flash;
@@ -79,8 +80,8 @@ int main(void)
     memcpy((void*)&(heep_data_address[SECTOR_WSIZE]), (void*)data_sram, NUM_BYTES);
 
     PRINTF("Read obi bytes at sector 1...\n");
-    uint8_t *heep8 = &(heep_data_address[SECTOR_WSIZE]);
-    uint8_t *data8 = &(data_sram[0]);
+    uint8_t *heep8 = (uint8_t *)(&(heep_data_address[SECTOR_WSIZE]));
+    uint8_t *data8 = (uint8_t *)(&(data_sram[0]));
     for(int i = 0; i < NUM_BYTES; i++) {
         if (heep8[i] != data8[i]) {
             PRINTF("Mismatch at index %d: expected 0x%x, got 0x%x\n", i, data8[i], heep8[i]);
@@ -92,7 +93,7 @@ int main(void)
     memset((void*)&(heep_data_address[SECTOR_WSIZE*4]), PATTERN8, NUM_BYTES);
 
     PRINTF("Read obi short at sector 4...\n");
-    uint16_t *heep16 = &(heep_data_address[SECTOR_WSIZE*4]);
+    uint16_t *heep16 = (uint16_t *)(&(heep_data_address[SECTOR_WSIZE*4]));
     for(int i = 0; i < NUM_WORDS; i++) {
         if (heep16[i] != PATTERN16) {
             PRINTF("Mismatch at index %d: expected 0x%x, got 0x%x\n", i, PATTERN16, heep16[i]);
