@@ -13,6 +13,7 @@
 #include "w25q128jw.h"
 #include "w25q128jw_controller.h"
 #include "dma.h"
+#include "data.h"
 
 
 /* By default, PRINTFs are activated for FPGA and disabled for simulation. */
@@ -27,19 +28,15 @@
     #define PRINTF(...)
 #endif
 
-int32_t __attribute__((section(".xheep_data_flash_only"))) __attribute__ ((aligned (16))) flash_buffer_test1[5] = {
-0xDEADBEEFu, 0xCAFEBABEu, 0xFEEDFACEu, 0xBAADF00Du, 0xE4F1BA5Eu
-};
-
+#define PATTERN8 0xA5
+#define PATTERN16 0xA5A5
 
 int main(void)
 {
     uint32_t v32;
     uint16_t v16;
     uint8_t v8;
-    uintptr_t base = FLASH_MEM_START_ADDRESS; // Base address for memory-mapped SPI flash
-
-    uint32_t data_write_buffer[4] = {0x9, 0x21, 0x43, 0xB7};
+    uintptr_t *base = FLASH_MEM_START_ADDRESS; // Base address for memory-mapped SPI flash
 
     spi_host_t* spi;
     spi = spi_flash;
@@ -47,52 +44,70 @@ int main(void)
     // Init SPI host and SPI<->Flash bridge parameters and Flash Power Up
     if (w25q128jw_init(spi) != FLASH_OK) return EXIT_FAILURE;
 
-    int32_t* flash_ptr_test1 = heep_get_flash_address_offset(flash_buffer_test1);
+    if (w25q128jw_controller_get_cache_available() == 0) {
+        PRINTF("Cache not available, aborting.\n");
+        return EXIT_FAILURE;
+    }
 
-    uintptr_t offset = (uintptr_t)flash_ptr_test1;
-    volatile uint8_t *ptr8 = (uint8_t *)(base + offset);
-    volatile uint16_t *ptr16 = (uint16_t *)(base + offset);
-    volatile uint32_t *ptr32 = (uint32_t *)(base + offset);
+    uint32_t* heep_data_address = heep_get_flash_address_offset(flash_source_pattern);
 
-    uint32_t flash_addr = (uint32_t)flash_ptr_test1;
-
-
-    PRINTF("Write flash with controller...\n");
+    if (((uint32_t)(heep_data_address) & (uint32_t)(base)) != (uint32_t)base)
+    {
+        heep_data_address = (uint32_t*)((uint32_t)(base) + (uint32_t)(heep_data_address));
+    }
 
     // Mandatory
     dma_set_hw_configuration_mode(1,0);
 
-    // w25q128jw_controller_write((void*)flash_addr, (void*)data_write_buffer, 16, 0, 0);
-    // while(!w25q128jw_controller_is_ready_polling());
+    PRINTF("Memory-mapped SPI flash test\n");
 
+    PRINTF("Write bytes at sector 0...\n");
+    // Using the controller to write data from SRAM to flash
+    w25q128jw_controller_write(flash_source_pattern, (void*)data_sram, NUM_BYTES, 0, 1);
+    while(!w25q128jw_controller_is_ready_polling());
 
-    PRINTF("Write obi word...\n");
-    PRINTF("Write result should be 0x12345678u: 0x%x\n", ptr32[0] = 0x12345678u);
-
-    PRINTF("Read obi words...\n");
-    for(int i = 0; i < 5; i++) {
-        v32 = ptr32[i];
-        PRINTF("0x%x\n", v32);
+    PRINTF("Read obi words at sector 0...\n");
+    for(int i = 0; i < NUM_WORDS; i++) {
+        if (heep_data_address[i] != data_sram[i]) {
+            PRINTF("Mismatch at index %d: expected 0x%x, got 0x%x\n", i, data_sram[i], heep_data_address[i]);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    PRINTF("Write obi short...\n");
-    PRINTF("Write result should be 0x1234u: 0x%x\n", ptr16[3] = 0x1234u);
-    PRINTF("Write result should be 0xA1A2u: 0x%x\n", ptr16[4] = 0xA1A2u);
+    PRINTF("Write obi bytes at sector 1...\n");
+    // Using memcpy to write data from SRAM to flash through the OBI interface
+    memcpy((void*)&(heep_data_address[SECTOR_WSIZE]), (void*)data_sram, NUM_BYTES);
 
-    PRINTF("Read obi short...\n");
-    for(int i = 0; i < 10; i++) {
-        v16 = ptr16[i];
-        PRINTF("0x%x\n", v16);
+    PRINTF("Read obi bytes at sector 1...\n");
+    uint8_t *heep8 = &(heep_data_address[SECTOR_WSIZE]);
+    uint8_t *data8 = &(data_sram[0]);
+    for(int i = 0; i < NUM_BYTES; i++) {
+        if (heep8[i] != data8[i]) {
+            PRINTF("Mismatch at index %d: expected 0x%x, got 0x%x\n", i, data8[i], heep8[i]);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    PRINTF("Write obi byte...\n");
-    PRINTF("Write result should be 0x99u: 0x%x\n", ptr8[10] = 0x99u);
+    PRINTF("Write obi bytes at sector 4...\n");
+    memset((void*)&(heep_data_address[SECTOR_WSIZE*4]), PATTERN8, NUM_BYTES);
 
-    PRINTF("Read obi bytes...\n");
-    for(int i = 0; i < 20; i++) {
-        v8 = ptr8[i];
-        PRINTF("0x%x\n", v8);
+    PRINTF("Read obi short at sector 4...\n");
+    uint16_t *heep16 = &(heep_data_address[SECTOR_WSIZE*4]);
+    for(int i = 0; i < NUM_WORDS; i++) {
+        if (heep16[i] != PATTERN16) {
+            PRINTF("Mismatch at index %d: expected 0x%x, got 0x%x\n", i, PATTERN16, heep16[i]);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    return 0;
+    PRINTF("Read obi words at sector 0 (check cache)...\n");
+    for(int i = 0; i < NUM_WORDS; i++) {
+        if (heep_data_address[i] != data_sram[i]) {
+            PRINTF("Mismatch at index %d: expected 0x%x, got 0x%x\n", i, data_sram[i], heep_data_address[i]);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    PRINTF("All tests passed.\n");
+    return EXIT_SUCCESS;
 }
