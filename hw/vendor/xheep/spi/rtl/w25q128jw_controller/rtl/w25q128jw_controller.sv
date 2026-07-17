@@ -21,6 +21,7 @@
 
 module w25q128jw_controller
   import dma_reg_pkg::*;
+  import power_manager_pkg::*;
   import spi_host_reg_pkg::*;
   import flash_llc_cache_reg_pkg::*;
 #(
@@ -60,6 +61,11 @@ module w25q128jw_controller
     // SPI HW register
     input spi_host_reg_pkg::spi_host_hw2reg_status_reg_t external_spi_host_hw2reg_status_i,
 
+    //LLC cache power
+    input power_manager_out_t llc_cache_pwr_ctrl_i,
+    output power_manager_in_t llc_cache_pwr_ctrl_o,
+
+    
     // DMA channel redy/done signals (directly from DMA IP)
     input logic [DMA_CH_NUM-1:0] dma_ready_i,
     input logic [DMA_CH_NUM-1:0] dma_done_i
@@ -2043,6 +2049,8 @@ module w25q128jw_controller
       ) flash_llc_cache_i (
           .clk_i            (clk_i),
           .rst_ni           (rst_ni),
+          .pwr_ctrl_i(llc_cache_pwr_ctrl_i),
+          .pwr_ctrl_o(llc_cache_pwr_ctrl_o),
           .dma_req_i        (cache_dma_req),
           .dma_resp_o       (cache_dma_resp),
           .controller_req_i (cache_ctrl_req),
@@ -2056,6 +2064,7 @@ module w25q128jw_controller
       assign cache_dma_resp = '0;
       assign cache_ctrl_resp = '0;
       assign cache_rdata = '0;
+      assign llc_cache_pwr_ctrl_o = '0;
     end
   endgenerate
 

@@ -4,6 +4,11 @@
 
 <%
   base_peripheral_domain = xheep.get_base_peripheral_domain()
+  if base_peripheral_domain.contains_peripheral('w25q128jw_controller'):
+    w25 = xheep.get_base_peripheral_domain().get_W25Q128JW_controller()
+    cache = w25.get_cache()
+  else:
+    cache = 0
 %>
 
 
@@ -164,6 +169,12 @@ module ao_peripheral_subsystem
   reg_rsp_t regdemux2perconv_resp;
   dma_reg_pkg::dma_hw2reg_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] external_dma_hw2reg;
   logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] dma_ready;
+
+% if cache:
+  /* Cache power */
+  power_manager_in_t w25_cache_pwr_ctrl_i;
+  power_manager_out_t w25_cache_pwr_ctrl_o;
+% endif
 
   /*_________________________________________________________________________________________________________________________________ */
 
@@ -355,6 +366,10 @@ module ao_peripheral_subsystem
 % if base_peripheral_domain.contains_peripheral('w25q128jw_controller'):
       .flash_ctr_reg_req_i(ao_peripheral_slv_req[core_v_mini_mcu_pkg::W25Q128JW_CONTROLLER_IDX]),
       .flash_ctr_reg_rsp_o(ao_peripheral_slv_rsp[core_v_mini_mcu_pkg::W25Q128JW_CONTROLLER_IDX]),
+% if cache:
+      .w25q128jw_cache_pwr_ctrl_i(w25_cache_pwr_ctrl_o),
+      .w25q128jw_cache_pwr_ctrl_o(w25_cache_pwr_ctrl_i),
+% endif
 % else:
       .flash_ctr_reg_req_i('0),
       .flash_ctr_reg_rsp_o(),
@@ -410,6 +425,10 @@ module ao_peripheral_subsystem
       .peripheral_subsystem_pwr_ctrl_i,
       .memory_subsystem_pwr_ctrl_i,
       .external_subsystem_pwr_ctrl_i,
+% if cache:
+      .w25_cache_pwr_ctrl_i,
+      .w25_cache_pwr_ctrl_o,
+% endif
       .dma_subsystem_pwr_ctrl_o(dma_subsystem_pwr_ctrl)
   );
 

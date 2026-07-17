@@ -3,10 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 
 <%
-  base_peripheral_domain = xheep.get_base_peripheral_domain()
+    base_peripheral_domain = xheep.get_base_peripheral_domain()
+    if base_peripheral_domain.contains_peripheral('w25q128jw_controller'):
+        w25 = xheep.get_base_peripheral_domain().get_W25Q128JW_controller()
+        cache = w25.get_cache()
+    else:
+        cache = 0
 %>
 
-module spi_subsystem #(
+module spi_subsystem
+  import power_manager_pkg::*;
+#(
     // SPI host memory address
     parameter logic [31:0] SPI_FLASH_START_ADDRESS = 'h0,
     parameter logic [31:0] W25Q128JW_CONTROLLER_START_ADDRESS = 'h0,
@@ -32,6 +39,11 @@ module spi_subsystem #(
     // w25q128jw flash controller configuration
     input  reg_req_t  flash_ctr_reg_req_i,
     output reg_rsp_t  flash_ctr_reg_rsp_o,
+
+% if cache:
+    input power_manager_out_t w25q128jw_cache_pwr_ctrl_i,
+    output power_manager_in_t w25q128jw_cache_pwr_ctrl_o,
+% endif
 
     //dma hw controller
     output dma_reg_pkg::dma_hw2reg_t external_dma_hw2reg_o,
@@ -117,6 +129,11 @@ module spi_subsystem #(
       .out_rsp_i(spi_host_reg_rsp_mux)
   );
 
+% if not cache:
+  power_manager_out_t w25q128jw_cache_pwr_ctrl_i = '0;
+  power_manager_in_t w25q128jw_cache_pwr_ctrl_o;
+% endif
+
   w25q128jw_controller #(
       .SPI_FLASH_START_ADDRESS(SPI_FLASH_START_ADDRESS),
       .W25Q128JW_CONTROLLER_START_ADDRESS(W25Q128JW_CONTROLLER_START_ADDRESS),
@@ -148,6 +165,9 @@ module spi_subsystem #(
       // Master ports on the system bus
       .spi_host_reg_req_o(spi_host_reg_req),
       .spi_host_reg_rsp_i(spi_host_reg_rsp),
+
+      .llc_cache_pwr_ctrl_i(w25q128jw_cache_pwr_ctrl_i),
+      .llc_cache_pwr_ctrl_o(w25q128jw_cache_pwr_ctrl_o),
 
       .dma_ready_i,
       .dma_done_i

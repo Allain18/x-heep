@@ -3,8 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 <% 
-    w25 = xheep.get_base_peripheral_domain().get_W25Q128JW_controller()
-    cache = w25.get_cache()
+    base_peripheral_domain = xheep.get_base_peripheral_domain()
+    if base_peripheral_domain.contains_peripheral('w25q128jw_controller'):
+        w25 = xheep.get_base_peripheral_domain().get_W25Q128JW_controller()
+        cache = w25.get_cache()
+    else:
+        cache = 0
 %>
 
 { name: "w25q128jw_controller"

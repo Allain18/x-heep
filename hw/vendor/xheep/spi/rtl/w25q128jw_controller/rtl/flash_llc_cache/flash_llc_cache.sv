@@ -11,6 +11,7 @@
 
 module flash_llc_cache
   import flash_llc_cache_reg_pkg::*;
+  import power_manager_pkg::*;
 #(
     parameter int unsigned SramLatency = 32'd1,
 
@@ -20,6 +21,10 @@ module flash_llc_cache
 ) (
     input logic clk_i,
     input logic rst_ni,
+
+    // Power control
+    input power_manager_out_t pwr_ctrl_i,
+    output power_manager_in_t pwr_ctrl_o,
 
     // DMA (SLAVE) communication
     input  obi_req_t dma_req_i,
@@ -222,21 +227,31 @@ module flash_llc_cache
       .victim_sector_o(victim_sector)
   );
 
+  logic clk_cg;
+
+  tc_clk_gating clk_gating_cell_i (
+        .clk_i,
+        .en_i(pwr_ctrl_i.clkgate_en_n),
+        .test_en_i(1'b0),
+        .clk_o(clk_cg)
+    );
+
   // Cache data (SRAM bank)
-  tc_sram #(
-      .NumWords (N_WORDS),         // Number of Words in data array
-      .DataWidth(WORD_SIZE_BITS),  // Data signal width (in bits)
-      .ByteWidth(BYTE_SIZE_BITS),  // Width of a data byte (in bits)
-      .NumPorts (N_WAYS),          // Number of read and write ports
-      .Latency  (SramLatency)      // Latency when the read data is available
+  sram_wrapper #(
+      .NumWords (32'd8096),         // Number of Words in data array
+      .DataWidth(WORD_SIZE_BITS)  // Data signal width (in bits)
   ) cache_data (
-      .clk_i  (clk_i),
+      .clk_i  (clk_cg),
       .rst_ni (rst_ni),
       .req_i  (mem_req),
       .we_i   (mem_we),
-      .addr_i (mem_addr),
+      .addr_i ({1'd0, mem_addr}),
       .wdata_i(mem_wdata),
       .be_i   (mem_be),
+      // Power signal
+      .pwrgate_ni(pwr_ctrl_i.pwrgate_en_n),
+      .pwrgate_ack_no(pwr_ctrl_o.pwrgate_ack_n),
+      .set_retentive_ni(pwr_ctrl_i.retentive_en_n),
       // output ports
       .rdata_o(mem_rdata)
   );
