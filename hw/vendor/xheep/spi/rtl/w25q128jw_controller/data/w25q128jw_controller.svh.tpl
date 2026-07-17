@@ -15,5 +15,5 @@
 %>
 
 % if cache:
-`define CACHE_EN
+`define CACHE_EN_def
 % endif

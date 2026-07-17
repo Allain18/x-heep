@@ -17,6 +17,8 @@
  *                                   <alaingirardvd@gmail.com>
  */
 
+`include "w25q128jw_controller.svh"
+
 module w25q128jw_controller
   import dma_reg_pkg::*;
   import spi_host_reg_pkg::*;
@@ -80,7 +82,7 @@ module w25q128jw_controller
 
   localparam logic [23:0] SPI_DUMMY_CYCLES_WAIT = 24'h03;
 
-`ifdef CACHE_EN
+`ifdef CACHE_EN_def
   localparam CACHE_EN = 1;
 `else
   localparam CACHE_EN = 0;
@@ -106,7 +108,7 @@ module w25q128jw_controller
   PAGE_WSIZE = 13'h40,  // Page size in words
   PAGE_BSIZE = 13'h100;  // Page size in bytes
 
-`ifdef CACHE_EN
+`ifdef CACHE_EN_def
   localparam logic [31:0] CACHE_DATA_ADDR = W25Q128JW_CONTROLLER_START_ADDRESS
                             + {{(32-w25q128jw_controller_reg_pkg::BlockAw){1'b0}}, W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET};
 `else
@@ -1999,7 +2001,7 @@ module w25q128jw_controller
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
 
-`ifdef CACHE_EN
+`ifdef CACHE_EN_def
   // Forward cache SRAM read data to the CACHE_DATA register so DMA can read it
   assign hw2reg.cache_data.de = CACHE_EN & cache_dma_resp.rvalid;
   assign hw2reg.cache_data.d  = cache_dma_resp.rdata;
@@ -2007,7 +2009,7 @@ module w25q128jw_controller
 
   // ============== CACHE INSTANTIATION ==============
   always_comb begin
-`ifdef CACHE_EN
+`ifdef CACHE_EN_def
     cache_data_bus_we = reg_req_i.valid
                             & reg_req_i.write
                             & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
