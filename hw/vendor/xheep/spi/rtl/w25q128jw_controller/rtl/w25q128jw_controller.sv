@@ -1306,7 +1306,12 @@ module w25q128jw_controller
                     fwait_return_d = FWAIT_RETURN_IDLE;
                     if (reg2hw.length.q == 0) begin
                       // All sectors done
-                      top_state_d = TOP_DONE;
+                      if (memio_state_q != MEMIO_IDLE) begin //Cache enable
+                        check_cache_state_d = CHECK_CACHE_MISS_CLEAN;
+                        top_state_d         = TOP_CHECK_CACHE;
+                      end else begin
+                        top_state_d = TOP_DONE;
+                      end
                     end else begin
                       if (CACHE_EN) begin
                         // Victim cache line is now clean, can now load requested cache line
