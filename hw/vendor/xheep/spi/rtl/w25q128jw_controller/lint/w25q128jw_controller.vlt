@@ -18,8 +18,8 @@ lint_off -rule UNUSED -file "*/w25q128jw_controller.sv" -match "Bits of signal a
 lint_off -rule UNUSED -file "*/w25q128jw_controller_reg_top.sv" -match "Parameter is not used: 'AW'*"
 lint_off -rule UNUSEDSIGNAL -file "*/w25q128jw_controller.sv" -match "Signal is not used: 'cache_dma_resp'"
 lint_off -rule WIDTHEXPAND  -file "*/w25q128jw_controller.sv" -match "*W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET*"
-lint_off -rule UNUSEDSIGNAL -file "*/cache.sv"                -match "Bits of signal are not used: 'dma_req_i'*"
-lint_off -rule UNUSEDSIGNAL -file "*/cache_way.sv"            -match "Bits of signal are not used: 'request_i'*"
+lint_off -rule UNUSEDSIGNAL -file "*/flash_llc_cache.sv"                -match "Bits of signal are not used: 'dma_req_i'*"
+lint_off -rule UNUSEDSIGNAL -file "*/flash_llc_cache_way.sv"            -match "Bits of signal are not used: 'request_i'*"
 // Width and unused-signal waivers for cache code paths (exposed when CACHE_EN ifdef was replaced with parameter)
 lint_off -rule WIDTHTRUNC   -file "*/w25q128jw_controller.sv"
 lint_off -rule WIDTHEXPAND  -file "*/w25q128jw_controller.sv"
