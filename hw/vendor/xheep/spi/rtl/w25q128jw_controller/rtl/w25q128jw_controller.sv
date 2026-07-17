@@ -62,10 +62,10 @@ module w25q128jw_controller
     input spi_host_reg_pkg::spi_host_hw2reg_status_reg_t external_spi_host_hw2reg_status_i,
 
     //LLC cache power
-    input power_manager_out_t llc_cache_pwr_ctrl_i,
-    output power_manager_in_t llc_cache_pwr_ctrl_o,
+    input  power_manager_out_t llc_cache_pwr_ctrl_i,
+    output power_manager_in_t  llc_cache_pwr_ctrl_o,
 
-    
+
     // DMA channel redy/done signals (directly from DMA IP)
     input logic [DMA_CH_NUM-1:0] dma_ready_i,
     input logic [DMA_CH_NUM-1:0] dma_done_i
@@ -398,6 +398,7 @@ module w25q128jw_controller
   obi_rsp_t          cache_dma_resp;
   logic              cache_req;
   data_t             cache_rdata;
+  logic              cache_valid;
   logic cache_data_bus_we, cache_data_bus_re;
 
   // Intermediate signals
@@ -497,7 +498,7 @@ module w25q128jw_controller
   assign hw2reg.status.cache.de = 1'b1;
 `ifdef CACHE_EN_def
   assign hw2reg.status.cache.d = 1'b1;
-`else 
+`else
   assign hw2reg.status.cache.d = 1'b0;
 `endif
 
@@ -533,7 +534,7 @@ module w25q128jw_controller
 
       cache_ctrl_req = '0;
       victim_sector_offset_d = victim_sector_offset_q;
-      cache_req = 'h0;
+      cache_req = '0;
     end
 
     hw2reg.control.start.de = 1'b0;
@@ -765,7 +766,7 @@ module w25q128jw_controller
 
           READ_CACHE_MEMIO_REQ: begin
             cache_req = 1'b1;
-            read_cache_state_d = READ_CACHE_MEMIO;
+            if (cache_valid) read_cache_state_d = READ_CACHE_MEMIO;
           end
 
           READ_CACHE_MEMIO: begin
@@ -1306,7 +1307,7 @@ module w25q128jw_controller
                     fwait_return_d = FWAIT_RETURN_IDLE;
                     if (reg2hw.length.q == 0) begin
                       // All sectors done
-                      if (memio_state_q != MEMIO_IDLE) begin //Cache enable
+                      if (memio_state_q != MEMIO_IDLE) begin  //Cache enable
                         check_cache_state_d = CHECK_CACHE_MISS_CLEAN;
                         top_state_d         = TOP_CHECK_CACHE;
                       end else begin
@@ -1613,7 +1614,7 @@ module w25q128jw_controller
 
           MODIFY_MEMIO_REQ: begin
             cache_req = 1'b1;
-            modify_state_d = MODIFY_MEMIO;
+            if (cache_valid) modify_state_d = MODIFY_MEMIO;
           end
 
           MODIFY_MEMIO: begin
@@ -2061,8 +2062,8 @@ module w25q128jw_controller
       ) flash_llc_cache_i (
           .clk_i            (clk_i),
           .rst_ni           (rst_ni),
-          .pwr_ctrl_i(llc_cache_pwr_ctrl_i),
-          .pwr_ctrl_o(llc_cache_pwr_ctrl_o),
+          .pwr_ctrl_i       (llc_cache_pwr_ctrl_i),
+          .pwr_ctrl_o       (llc_cache_pwr_ctrl_o),
           .dma_req_i        (cache_dma_req),
           .dma_resp_o       (cache_dma_resp),
           .controller_req_i (cache_ctrl_req),
@@ -2070,12 +2071,14 @@ module w25q128jw_controller
           .mem_man_req      (cache_req),
           .memio_wdata      (memio_data_q),
           .memio_be         (memio_be_q),
+          .valid_bridge     (cache_valid),
           .mem_rdata        (cache_rdata)
       );
     end else begin : gen_no_cache
       assign cache_dma_resp = '0;
       assign cache_ctrl_resp = '0;
       assign cache_rdata = '0;
+      assign cache_valid = '0;
       assign llc_cache_pwr_ctrl_o = '0;
     end
   endgenerate

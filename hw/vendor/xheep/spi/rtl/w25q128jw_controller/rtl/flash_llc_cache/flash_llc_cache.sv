@@ -13,8 +13,6 @@ module flash_llc_cache
   import flash_llc_cache_reg_pkg::*;
   import power_manager_pkg::*;
 #(
-    parameter int unsigned SramLatency = 32'd1,
-
     // OBI Interface data types
     parameter type obi_req_t = logic,
     parameter type obi_rsp_t = logic
@@ -23,8 +21,8 @@ module flash_llc_cache
     input logic rst_ni,
 
     // Power control
-    input power_manager_out_t pwr_ctrl_i,
-    output power_manager_in_t pwr_ctrl_o,
+    input  power_manager_out_t pwr_ctrl_i,
+    output power_manager_in_t  pwr_ctrl_o,
 
     // DMA (SLAVE) communication
     input  obi_req_t dma_req_i,
@@ -37,6 +35,7 @@ module flash_llc_cache
     input  logic  mem_man_req,
     input  be_t   memio_be,
     input  data_t memio_wdata,
+    output logic  valid_bridge,
     output data_t mem_rdata
 );
 
@@ -74,7 +73,7 @@ module flash_llc_cache
   be_t                       mem_be;
 
   logic                      gnt;
-  logic  [  SramLatency-1:0] rvalid;
+  logic                      rvalid;
 
   // FSM state, word counter, and target sector address
   always_ff @(posedge clk_i or negedge rst_ni) begin
@@ -203,11 +202,14 @@ module flash_llc_cache
   // - grand only when the new operation is registered
   assign gnt = dma_req_i.req & ((active_op_q == CACHE_READ) | (active_op_q == CACHE_WRITE));
 
-  always_ff @(posedge clk_i or negedge rst_ni) begin
+  logic clk_cg;
+  always_ff @(posedge clk_cg or negedge rst_ni) begin
     if (!rst_ni) begin
       rvalid <= '0;
+      valid_bridge <= '0;
     end else begin
-      rvalid <= (rvalid << 1) | SramLatency'(gnt);
+      rvalid <= gnt;
+      valid_bridge <= mem_man_req;
     end
   end
 
@@ -227,19 +229,17 @@ module flash_llc_cache
       .victim_sector_o(victim_sector)
   );
 
-  logic clk_cg;
-
   tc_clk_gating clk_gating_cell_i (
-        .clk_i,
-        .en_i(pwr_ctrl_i.clkgate_en_n),
-        .test_en_i(1'b0),
-        .clk_o(clk_cg)
-    );
+      .clk_i,
+      .en_i(pwr_ctrl_i.clkgate_en_n),
+      .test_en_i(1'b0),
+      .clk_o(clk_cg)
+  );
 
   // Cache data (SRAM bank)
   sram_wrapper #(
-    // Needeed size is 4096, however, ram size of 8192 are already instanciated, so it's easier to use
-      .NumWords (32'd8192),         // Number of Words in data array
+      // Needeed size is 4096, however, ram size of 8192 are already instanciated, so it's easier to use
+      .NumWords (32'd8192),       // Number of Words in data array
       .DataWidth(WORD_SIZE_BITS)  // Data signal width (in bits)
   ) cache_data (
       .clk_i  (clk_cg),
@@ -261,7 +261,7 @@ module flash_llc_cache
 
   // DMA response
   assign dma_resp_o.gnt = gnt;
-  assign dma_resp_o.rvalid = rvalid[SramLatency-1] & last_word_was_read_q; // rvalid is only relevant for READ operations, and we want to assert rvalid in the cycle when the last word of the sector is transferred
+  assign dma_resp_o.rvalid = rvalid & last_word_was_read_q; // rvalid is only relevant for READ operations, and we want to assert rvalid in the cycle when the last word of the sector is transferred
   assign dma_resp_o.rdata = mem_rdata;
 
   // Controller response
