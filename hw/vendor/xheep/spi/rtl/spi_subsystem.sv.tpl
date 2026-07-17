@@ -177,6 +177,7 @@ module spi_subsystem
   assign w25q128jw_controller_intr_o = '0;
   assign flash_ctr_reg_rsp_o = '0;
   assign external_dma_hw2reg_o = '0;
+  assign spimemio_resp_o = '0;
   logic [DMA_CH_NUM-1:0] dma_ready_unused = dma_ready_i;
   spi_host_reg_pkg::spi_host_hw2reg_status_reg_t external_spi_host_hw2reg_status_unused = external_spi_host_hw2reg_status;
 % endif
