@@ -238,7 +238,7 @@ module flash_llc_cache
 
   // Cache data (SRAM bank)
   sram_wrapper #(
-      .NumWords (32'd8096),         // Number of Words in data array
+      .NumWords (32'd8192),         // Number of Words in data array
       .DataWidth(WORD_SIZE_BITS)  // Data signal width (in bits)
   ) cache_data (
       .clk_i  (clk_cg),
