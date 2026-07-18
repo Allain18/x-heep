@@ -104,7 +104,7 @@
     {
       name:    "CACHE_DATA"
       desc:    "Cache data port, used to read from/write to the DMA buffer"
-      swaccess: "rw"
+      swaccess: "ro"
       hwaccess: "hrw"
       fields: [
         { bits: "31:0", name: "CACHE_DATA", desc: "Cache data port, used to read from/write to the DMA buffer" }

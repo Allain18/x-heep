@@ -86,7 +86,7 @@ uint32_t w25q128jw_controller_get_cache_available(void);
  * @param src  Pointer to the Flash
  * @param length_bytes Number of bytes to transfer.
  * @param interrupts Enable (1) or disable (0) interrupts for this operation.
- * @param quad SPI mode (1 for quad SPI, 0 for standard SPI).
+ * @param quad SPI mode (1 for quad SPI, 0 for standard SPI), fallback to standard SPI if not supported.
  */
 void w25q128jw_controller_read(void* dest, void* src, size_t length_bytes, uint32_t interrupts, uint32_t quad);
 
@@ -95,7 +95,7 @@ void w25q128jw_controller_read(void* dest, void* src, size_t length_bytes, uint3
  * @param src  Pointer to the on-chip SRAM
  * @param length_bytes Number of bytes to transfer.
  * @param interrupts Enable (1) or disable (0) interrupts for this operation.
- * @param quad SPI mode (1 for quad SPI, 0 for standard SPI).
+ * @param quad SPI mode (1 for quad SPI, 0 for standard SPI), fallback to standard SPI if not supported.
  */
 void w25q128jw_controller_write(void* dest, void* src, size_t length_bytes, uint32_t interrupts, uint32_t quad);
 
