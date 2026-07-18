@@ -32,11 +32,11 @@ module flash_llc_cache
     input  cache_req_t controller_req_i,
     output cache_res_t controller_resp_o,
 
-    input  logic  mem_man_req,
-    input  be_t   memio_be,
-    input  data_t memio_wdata,
-    output logic  valid_bridge,
-    output data_t mem_rdata
+    input  logic  mem_man_req_i,
+    input  be_t   memio_be_i,
+    input  data_t memio_wdata_i,
+    output logic  valid_bridge_o,
+    output data_t mem_rdata_o
 );
 
   // Currently implements single way cache (direct-mapped) only
@@ -176,14 +176,14 @@ module flash_llc_cache
 
         default: ;
       endcase
-    end else if (mem_man_req) begin
+    end else if (mem_man_req_i) begin
       unique case (active_op_q)
         CACHE_WRITE: begin
           mem_req   = 1'b1;
           mem_we    = 1'b1;
           mem_addr  = SramAddrWidth'({target_set_q, word_counter_q});
-          mem_wdata = memio_wdata;
-          mem_be    = memio_be;
+          mem_wdata = memio_wdata_i;
+          mem_be    = memio_be_i;
         end
 
         CACHE_READ: begin
@@ -206,10 +206,10 @@ module flash_llc_cache
   always_ff @(posedge clk_cg or negedge rst_ni) begin
     if (!rst_ni) begin
       rvalid <= '0;
-      valid_bridge <= '0;
+      valid_bridge_o <= '0;
     end else begin
       rvalid <= gnt;
-      valid_bridge <= mem_man_req;
+      valid_bridge_o <= mem_man_req_i;
     end
   end
 
@@ -254,7 +254,7 @@ module flash_llc_cache
       .pwrgate_ack_no(pwr_ctrl_o.pwrgate_ack_n),
       .set_retentive_ni(pwr_ctrl_i.retentive_en_n),
       // output ports
-      .rdata_o(mem_rdata)
+      .rdata_o(mem_rdata_o)
   );
 
   // Output assignments
@@ -262,7 +262,7 @@ module flash_llc_cache
   // DMA response
   assign dma_resp_o.gnt = gnt;
   assign dma_resp_o.rvalid = rvalid & last_word_was_read_q; // rvalid is only relevant for READ operations, and we want to assert rvalid in the cycle when the last word of the sector is transferred
-  assign dma_resp_o.rdata = mem_rdata;
+  assign dma_resp_o.rdata = mem_rdata_o;
 
   // Controller response
   assign controller_resp_o.hit = hit;

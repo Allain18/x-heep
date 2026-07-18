@@ -1,4 +1,4 @@
-# W25Q128JW CONTROLLER
+# W25Q128JW controller
 
 ```{contents} Table of Contents
 :depth: 2

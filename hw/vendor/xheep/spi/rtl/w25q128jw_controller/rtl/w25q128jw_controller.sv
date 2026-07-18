@@ -2068,11 +2068,11 @@ module w25q128jw_controller
           .dma_resp_o       (cache_dma_resp),
           .controller_req_i (cache_ctrl_req),
           .controller_resp_o(cache_ctrl_resp),
-          .mem_man_req      (cache_req),
-          .memio_wdata      (memio_data_q),
-          .memio_be         (memio_be_q),
-          .valid_bridge     (cache_valid),
-          .mem_rdata        (cache_rdata)
+          .mem_man_req_i    (cache_req),
+          .memio_wdata_i    (memio_data_q),
+          .memio_be_i       (memio_be_q),
+          .valid_bridge_o   (cache_valid),
+          .mem_rdata_o      (cache_rdata)
       );
     end else begin : gen_no_cache
       assign cache_dma_resp = '0;
