@@ -58,7 +58,9 @@ def config():
     base_peripheral_domain.add_peripheral(SOC_ctrl(0x00000000))
     base_peripheral_domain.add_peripheral(Bootrom(0x00010000))
     base_peripheral_domain.add_peripheral(SPI_flash(0x00020000, 0x00008000))
-    base_peripheral_domain.add_peripheral(W25Q128JW_Controller(0x00029000, 0x00007000))
+    base_peripheral_domain.add_peripheral(
+        W25Q128JW_Controller(0x00029000, 0x00007000, cache="no")
+    )
     base_peripheral_domain.add_peripheral(
         DMA(
             address=0x30000,
