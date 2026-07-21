@@ -6,9 +6,6 @@
     memory_ss = xheep.memory_ss()
     external_domains = xheep.get_base_peripheral_domain().get_power_manager().get_external_domains()
 
-    memory_ss = xheep.memory_ss()
-    external_domains = xheep.get_base_peripheral_domain().get_power_manager().get_external_domains()
-
     base_peripheral_domain = xheep.get_base_peripheral_domain()
     if base_peripheral_domain.contains_peripheral('w25q128jw_controller'):
       w25 = xheep.get_base_peripheral_domain().get_W25Q128JW_controller()
@@ -479,18 +476,7 @@
     }
 
 % endfor
-% if cache:
-    { name:     "MONITOR_POWER_GATE_RAM_BLOCK_w25_cache",
-      desc:     "Used to monitor the signals to power gate ram block w25_cache",
-      resval:   "0x00000000"
-      swaccess: "ro",
-      hwaccess: "hwo",
-      fields: [
-        { bits: "1:0", name: "MONITOR_POWER_GATE_RAM_BLOCK_w25_cache", desc: "Monitor Signals Power Gate Ram Block w25_cache Reg" }
-      ]
-    }
 
-% endif
 % for ext in range(external_domains):
     { name:     "MONITOR_POWER_GATE_EXTERNAL_${ext}",
       desc:     "Used to monitor the signals to power gate external ${ext}",

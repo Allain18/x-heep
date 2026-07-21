@@ -19,6 +19,8 @@ module spi_subsystem
     parameter logic [31:0] W25Q128JW_CONTROLLER_START_ADDRESS = 'h0,
     // External DMA number of channels
     parameter int unsigned DMA_CH_NUM = 'd1,
+    // Cache enable
+    parameter bit CACHE_EN = 1'b0,
     // OBI and Register Interface data types
     parameter type obi_req_t = logic,
     parameter type obi_rsp_t = logic,
@@ -138,6 +140,7 @@ module spi_subsystem
       .SPI_FLASH_START_ADDRESS(SPI_FLASH_START_ADDRESS),
       .W25Q128JW_CONTROLLER_START_ADDRESS(W25Q128JW_CONTROLLER_START_ADDRESS),
       .DMA_CH_NUM(DMA_CH_NUM),
+      .CACHE_EN(CACHE_EN),
       .reg_req_t(reg_req_t),
       .reg_rsp_t(reg_rsp_t),
       .obi_req_t(obi_req_t),

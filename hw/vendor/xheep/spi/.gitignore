@@ -3,8 +3,6 @@
 
 # RTL files rendered from templates
 rtl/spi_subsystem.sv
-rtl/w25q128jw_controller/data/w25q128jw_controller.svh
-rtl/w25q128jw_controller/data/w25q128jw_controller.hjson
 
 # Automatically generated configuration registers files
 rtl/w25q128jw_controller/rtl/w25q128jw_controller_reg_pkg.sv

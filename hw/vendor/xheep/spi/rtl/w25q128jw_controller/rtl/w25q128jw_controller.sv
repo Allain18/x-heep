@@ -17,8 +17,6 @@
  *                                   <alaingirardvd@gmail.com>
  */
 
-`include "w25q128jw_controller.svh"
-
 module w25q128jw_controller
   import dma_reg_pkg::*;
   import power_manager_pkg::*;
@@ -31,6 +29,8 @@ module w25q128jw_controller
     // External DMA number of channels
     parameter int unsigned DMA_CH_NUM = 'd1,
 
+    // Cache enable
+    parameter bit CACHE_EN = 1'b0,
     // Register Interface data types
     parameter type reg_req_t = logic,
     parameter type reg_rsp_t = logic,
@@ -88,12 +88,6 @@ module w25q128jw_controller
 
   localparam logic [23:0] SPI_DUMMY_CYCLES_WAIT = 24'h03;
 
-`ifdef CACHE_EN_def
-  localparam CACHE_EN = 1;
-`else
-  localparam CACHE_EN = 0;
-`endif
-
 `ifdef VERILATOR
   localparam QUAD_AVAILABLE = 0;
 `else
@@ -114,12 +108,8 @@ module w25q128jw_controller
   PAGE_WSIZE = 13'h40,  // Page size in words
   PAGE_BSIZE = 13'h100;  // Page size in bytes
 
-`ifdef CACHE_EN_def
   localparam logic [31:0] CACHE_DATA_ADDR = W25Q128JW_CONTROLLER_START_ADDRESS
                             + {{(32-w25q128jw_controller_reg_pkg::BlockAw){1'b0}}, W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET};
-`else
-  localparam logic [31:0] CACHE_DATA_ADDR = '0;
-`endif
 
 
   // ============== BYTE SWAP FUNCTION ==============
@@ -411,6 +401,10 @@ module w25q128jw_controller
   logic [31:0] memio_write_offset_q, memio_write_offset_d;
   memio_state_e memio_state_q, memio_state_d;
 
+  /* Register interface signals */
+  reg_req_t reg_req_param;
+  reg_rsp_t reg_rsp_param;
+
   // FSM sequential logic
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -496,11 +490,7 @@ module w25q128jw_controller
   assign quad_select = (reg2hw.control.quad.q && QUAD_AVAILABLE) || (memio_state_q != MEMIO_IDLE && QUAD_AVAILABLE);
 
   assign hw2reg.status.cache.de = 1'b1;
-`ifdef CACHE_EN_def
-  assign hw2reg.status.cache.d = 1'b1;
-`else
-  assign hw2reg.status.cache.d = 1'b0;
-`endif
+  assign hw2reg.status.cache.d = CACHE_EN;
 
   // FSM combinational logic
   always_comb begin
@@ -2020,38 +2010,39 @@ module w25q128jw_controller
   assign w25q128jw_controller_intr_o = reg2hw.intr_status.q; // ISR Handler lowers interrupt status register (interrupt register is risen in hw2reg by FSM when done)
 
 
-`ifdef CACHE_EN_def
-  // Forward cache SRAM read data to the CACHE_DATA register so DMA can read it
-  assign hw2reg.cache_data.de = CACHE_EN & cache_dma_resp.rvalid;
-  assign hw2reg.cache_data.d  = cache_dma_resp.rdata;
-`endif
+  generate
+    if (CACHE_EN) begin : gen_cache_reg
+      assign hw2reg.cache_data.de = cache_dma_resp.rvalid;
+      assign hw2reg.cache_data.d  = cache_dma_resp.rdata;
+    end
+  endgenerate
 
   // ============== CACHE INSTANTIATION ==============
   always_comb begin
-`ifdef CACHE_EN_def
-    cache_data_bus_we = reg_req_i.valid
-                            & reg_req_i.write
-                            & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
-    cache_data_bus_re = reg_req_i.valid
-                            & ~reg_req_i.write
-                            & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+    if (CACHE_EN) begin
+      cache_data_bus_we = reg_req_i.valid
+                              & reg_req_i.write
+                              & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
+      cache_data_bus_re = reg_req_i.valid
+                              & ~reg_req_i.write
+                              & (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0] == W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET);
 
-    cache_dma_req = '0;
+      cache_dma_req = '0;
 
-    if (cache_data_bus_we) begin
-      cache_dma_req.req   = 1'b1;
-      cache_dma_req.we    = 1'b1;
-      cache_dma_req.wdata = reg_req_i.wdata;
-      cache_dma_req.be    = reg_req_i.wstrb;
-    end else if (cache_data_bus_re && !cache_dma_resp.rvalid) begin
-      cache_dma_req.req = 1'b1;
-      cache_dma_req.we  = 1'b0;
+      if (cache_data_bus_we) begin
+        cache_dma_req.req   = 1'b1;
+        cache_dma_req.we    = 1'b1;
+        cache_dma_req.wdata = reg_req_i.wdata;
+        cache_dma_req.be    = reg_req_i.wstrb;
+      end else if (cache_data_bus_re && !cache_dma_resp.rvalid) begin
+        cache_dma_req.req = 1'b1;
+        cache_dma_req.we  = 1'b0;
+      end
+    end else begin
+      cache_data_bus_we = 1'b0;
+      cache_data_bus_re = 1'b0;
+      cache_dma_req = '0;
     end
-`else
-    cache_data_bus_we = 1'b0;
-    cache_data_bus_re = 1'b0;
-    cache_dma_req = '0;
-`endif
   end
 
   generate
@@ -2090,18 +2081,40 @@ module w25q128jw_controller
   ) w25q128jw_controller_reg_top_i (
       .clk_i(clk_i),
       .rst_ni(rst_ni),
-      .reg_req_i,
+      .reg_req_i(reg_req_param),
       .reg_rsp_o(reg_rsp_int),
       .reg2hw,
       .hw2reg,
       .devmode_i(1'b1)
   );
 
+
+
   // If cache read requested, delay ready until cache response is valid
-  assign reg_rsp_o.ready = reg_rsp_int.ready
+  assign reg_rsp_param.ready = reg_rsp_int.ready
                             & ~(CACHE_EN & cache_data_bus_re & ~cache_dma_resp.rvalid);
-  assign reg_rsp_o.rdata = (CACHE_EN & cache_dma_resp.rvalid & cache_data_bus_re)
+  assign reg_rsp_param.rdata = (CACHE_EN & cache_dma_resp.rvalid & cache_data_bus_re)
                             ? cache_dma_resp.rdata : reg_rsp_int.rdata;
-  assign reg_rsp_o.error = reg_rsp_int.error;
+  assign reg_rsp_param.error = reg_rsp_int.error;
+
+  always_comb begin
+    reg_req_param = reg_req_i;
+    reg_rsp_o     = reg_rsp_param;
+    if (reg_req_i.valid) begin
+      case (reg_req_i.addr[w25q128jw_controller_reg_pkg::BlockAw-1:0])
+        W25Q128JW_CONTROLLER_CACHE_DATA_OFFSET: begin
+          if (CACHE_EN == 1'b0) begin
+            reg_req_param   = 'b0;
+            reg_rsp_o.error = 1'b1;
+            reg_rsp_o.ready = 1'b1;
+            reg_rsp_o.rdata = 'b0;
+          end
+        end
+        default: ;
+      endcase
+    end
+  end
+
+
 
 endmodule

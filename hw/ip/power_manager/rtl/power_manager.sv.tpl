@@ -690,10 +690,6 @@ module power_manager import power_manager_pkg::*; #(
   assign hw2reg.monitor_power_gate_ram_block_${bank.name()}.d = {memory_subsystem_banks_powergate_iso_n[${bank.name()}], memory_subsystem_banks_powergate_switch_n[${bank.name()}]};
 % endfor
 
-% if cache:
-  assign hw2reg.monitor_power_gate_ram_block_w25_cache.de = 1'b1;
-  assign hw2reg.monitor_power_gate_ram_block_w25_cache.d = {w25_cache_powergate_iso_n, w25_cache_powergate_switch_n};
-% endif
 
 % for ext in range(external_domains):
   assign hw2reg.monitor_power_gate_external_${ext}.de = 1'b1;
