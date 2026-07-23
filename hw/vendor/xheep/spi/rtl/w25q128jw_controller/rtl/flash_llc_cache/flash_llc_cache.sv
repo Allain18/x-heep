@@ -190,7 +190,7 @@ module flash_llc_cache
 
   // Cache valid signal
   // - grand only when the new operation is registered
-  assign gnt = dma_req_i.req & ((active_op_q == CACHE_READ) | (active_op_q == CACHE_WRITE));
+  assign gnt = (active_op_q == CACHE_READ) | (active_op_q == CACHE_WRITE);
 
   logic clk_cg;
   always_ff @(posedge clk_cg or negedge rst_ni) begin
@@ -198,7 +198,7 @@ module flash_llc_cache
       rvalid <= '0;
       valid_bridge_o <= '0;
     end else begin
-      rvalid <= gnt;
+      rvalid <= gnt & dma_req_i.req;
       valid_bridge_o <= mem_man_req_i;
     end
   end
