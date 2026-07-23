@@ -869,8 +869,8 @@ module w25q128jw_controller
           // -------- Check if TX FIFO has space for command --------
           READ_SPI_CHECK_TX_FIFO: begin
             // STATUS[7:0] = TXQD (TX FIFO depth). Proceed if not full.
-            // See hw/vendor/lowrisc_opentitan_spi_host/data/spi_host.hjson for status register bit mapping
-            // See hw/vendor/lowrisc_opentitan_spi_host/rtl/spi_host_reg_pkg.sv for TXQD depth definition
+            // See hw/vendor/xheep/spi/vendor/lowrisc_opentitan_spi_host/data/spi_host.hjson for status register bit mapping
+            // See hw/vendor/xheep/spi/vendor/lowrisc_opentitan_spi_host/rtl/spi_host_reg_pkg.sv for TXQD depth definition
             if (external_spi_host_hw2reg_status_i.txqd.d < SPI_FLASH_TX_FIFO_DEPTH[7:0]) begin
               read_state_d = quad_select ? READ_SPI_SEND_CMD_1_QUAD : READ_SPI_FILL_TX_FIFO;
             end
