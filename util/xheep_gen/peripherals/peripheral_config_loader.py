@@ -26,6 +26,7 @@ from .user_peripherals import (
     GPIO,
     I2C,
     RV_timer,
+    camera,
     SPI2,
     PDM2PCM,
     I2S,
@@ -75,6 +76,7 @@ def load_peripherals_config(system, config: hjson.OrderedDict):
         "serial_link": lambda o, l: SerialLink(o, l),
         "serial_link_reg": lambda o, l: SerialLinkReg(o, l),
         "serial_link_receiver_fifo": lambda o, l: SerialLinkReceiverFifo(o, l),
+        "camera": lambda o, l: camera(o, l),
     }
 
     for name, fields in config.items():
