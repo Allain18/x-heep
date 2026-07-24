@@ -61,9 +61,6 @@ module flash_llc_cache
   logic                            dirty;
   logic [SECTOR_ADDRESS_WIDTH-1:0] victim_sector;
   logic                            last_sector_word;
-  logic
-      last_word_was_read_q,
-      last_word_was_read_d;  // To track whether the last word transferred was a read
 
   // Cache Port signals
   logic                      mem_req;
@@ -84,8 +81,6 @@ module flash_llc_cache
       target_tag_q         <= '0;
       target_word_len_q    <= '0;
       target_dirty_q       <= '0;
-
-      last_word_was_read_q <= 1'b0;
     end else begin
       active_op_q          <= active_op_d;
       word_counter_q       <= word_counter_d;
@@ -93,8 +88,6 @@ module flash_llc_cache
       target_tag_q         <= target_tag_d;
       target_word_len_q    <= target_word_len_d;
       target_dirty_q       <= target_dirty_d;
-
-      last_word_was_read_q <= last_word_was_read_d;
     end
   end
 
@@ -106,11 +99,8 @@ module flash_llc_cache
     target_word_len_d    = target_word_len_q;
     target_dirty_d       = target_dirty_q;
 
-    last_word_was_read_d = last_word_was_read_q;
-
     // Last word of the sector is being transferred in current cycle
     last_sector_word     = (target_word_len_q == 'h1) & dma_req_i.req;
-    if (gnt) last_word_was_read_d = (active_op_q == CACHE_READ);
 
     if (controller_req_i.req) begin
       active_op_d       = controller_req_i.op;
@@ -200,7 +190,7 @@ module flash_llc_cache
 
   // Cache valid signal
   // - grand only when the new operation is registered
-  assign gnt = dma_req_i.req & ((active_op_q == CACHE_READ) | (active_op_q == CACHE_WRITE));
+  assign gnt = (active_op_q == CACHE_READ) | (active_op_q == CACHE_WRITE);
 
   logic clk_cg;
   always_ff @(posedge clk_cg or negedge rst_ni) begin
@@ -208,7 +198,7 @@ module flash_llc_cache
       rvalid <= '0;
       valid_bridge_o <= '0;
     end else begin
-      rvalid <= gnt;
+      rvalid <= gnt & dma_req_i.req;
       valid_bridge_o <= mem_man_req_i;
     end
   end
@@ -239,14 +229,14 @@ module flash_llc_cache
   // Cache data (SRAM bank)
   sram_wrapper #(
       // Needeed size is 4096, however, ram size of 8192 are already instanciated, so it's easier to use
-      .NumWords (32'd8192),       // Number of Words in data array
+      .NumWords (N_WORDS),       // Number of Words in data array
       .DataWidth(WORD_SIZE_BITS)  // Data signal width (in bits)
   ) cache_data (
       .clk_i  (clk_cg),
       .rst_ni (rst_ni),
       .req_i  (mem_req),
       .we_i   (mem_we),
-      .addr_i ({1'd0, mem_addr}),
+      .addr_i (mem_addr),
       .wdata_i(mem_wdata),
       .be_i   (mem_be),
       // Power signal
@@ -261,7 +251,7 @@ module flash_llc_cache
 
   // DMA response
   assign dma_resp_o.gnt = gnt;
-  assign dma_resp_o.rvalid = rvalid & last_word_was_read_q; // rvalid is only relevant for READ operations, and we want to assert rvalid in the cycle when the last word of the sector is transferred
+  assign dma_resp_o.rvalid = rvalid;
   assign dma_resp_o.rdata = mem_rdata_o;
 
   // Controller response
