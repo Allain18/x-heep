@@ -1,4 +1,8 @@
-/**
+/*
+ * Copyright EPFL contributors.
+ * Licensed under the Apache License, Version 2.0, see LICENSE for details.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file main.c
  * @brief Example application for W25Q128JW flash read test.
  *
