@@ -742,6 +742,16 @@ module testharness #(
           .io3(spi_flash_sd_io[3])
       );
 
+      // Camera example
+      camera_model camera_i(
+          .clk_i(clk_i),
+          .rst_ni(rst_ni),
+          .pclk_o(),
+          .vsync_o(),
+          .href_o(),
+          .data_o()
+      );
+
       // FPU Subsystem
       // -------------
       // WARNING: CV32E20 currently only supports offloading two source operands to the coprocessor.
