@@ -102,7 +102,20 @@ module peripheral_subsystem #(
     // PDM2PCM Interface
     output logic pdm2pcm_clk_o,
     output logic pdm2pcm_clk_en_o,
-    input  logic pdm2pcm_pdm_i
+    input  logic pdm2pcm_pdm_i,
+
+    // Camera
+    input logic camera_pclk_i,
+    input logic camera_vsync_i,
+    input logic camera_href_i,
+    input logic camera_data_0_i,
+    input logic camera_data_1_i,
+    input logic camera_data_2_i,
+    input logic camera_data_3_i,
+    input logic camera_data_4_i,
+    input logic camera_data_5_i,
+    input logic camera_data_6_i,
+    input logic camera_data_7_i
 );
 
   import core_v_mini_mcu_pkg::*;
@@ -676,6 +689,17 @@ module peripheral_subsystem #(
     assign ddr_snd_clk_o = '0;
     assign {ddr_snd_3_o, ddr_snd_2_o, ddr_snd_1_o, ddr_snd_0_o} = '0;
 %endif
+
+% if user_peripheral_domain.contains_peripheral('camera'):
+  // camera_if(
+  //     .reg_req_t(reg_req_t),
+  //     .reg_rsp_t(reg_rsp_t),
+  //     .obi_req_t(obi_req_t),
+  //     .obi_rsp_t(obi_rsp_t)
+  // ) camera_i(
+
+  // );
+% endif
 
 % if len(user_peripheral_domain.get_peripherals()) == 0:
   // If no peripherals are selected, tie off the slave response
