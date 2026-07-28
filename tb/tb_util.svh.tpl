@@ -139,12 +139,6 @@ task tb_dumpHEX;
   logic [31:0] word;
   int i, r_addr;
 
-  if (start_addr < 0 || end_addr >= core_v_mini_mcu_pkg::MEM_SIZE || start_addr > end_addr) begin
-    $display("[TESTBENCH] tb_dumpHEX: invalid range [0x%08x:0x%08x], MEM_SIZE is 0x%08x",
-             start_addr, end_addr, core_v_mini_mcu_pkg::MEM_SIZE);
-    return;
-  end
-
   % for bank in memory_ss.iter_ram_banks():
   for (i = ${bank.start_address()}; i < ${bank.end_address()}; i = i + 4) begin
     if (((i / 4) & ${2**bank.il_level()-1}) == ${bank.il_offset()}) begin
@@ -159,6 +153,5 @@ task tb_dumpHEX;
 % endfor
 
   $writememh(file, image, 0, core_v_mini_mcu_pkg::MEM_SIZE);
-  $display("[TESTBENCH] dumped RAM [0x%08x:0x%08x] (%0d bytes) to %0s", start_addr, end_addr,
-           end_addr - start_addr + 1, file);
+  $display("[TESTBENCH] dumped RAM [0x%08x:0x%08x] to %0s", 0, core_v_mini_mcu_pkg::MEM_SIZE, file);
 endtask
