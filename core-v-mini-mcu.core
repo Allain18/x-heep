@@ -41,6 +41,7 @@ filesets:
     - x-heep:ip:serial_link_xheep_wrapper
     - esl_epfl:ip:obi_spi_slave
     - x-heep:ip:w25q128jw_controller
+    - x-heep:ip:camera
     files:
     - hw/core-v-mini-mcu/core_v_mini_mcu.sv
     - hw/core-v-mini-mcu/cpu_subsystem.sv

@@ -691,14 +691,23 @@ module peripheral_subsystem #(
 %endif
 
 % if user_peripheral_domain.contains_peripheral('camera'):
-  // camera_if(
-  //     .reg_req_t(reg_req_t),
-  //     .reg_rsp_t(reg_rsp_t),
-  //     .obi_req_t(obi_req_t),
-  //     .obi_rsp_t(obi_rsp_t)
-  // ) camera_i(
+  logic [7:0]camera_data_i;
+  assign camera_data_i = {camera_data_7_i, camera_data_6_i, camera_data_5_i, camera_data_4_i,camera_data_3_i,camera_data_2_i,camera_data_1_i,camera_data_0_i};
 
-  // );
+  camera_if #(
+      .reg_req_t(reg_req_t),
+      .reg_rsp_t(reg_rsp_t)
+  ) camera_i(
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+    .reg_req_i(peripheral_slv_req[core_v_mini_mcu_pkg::CAMERA_IDX]),
+    .reg_rsp_o(peripheral_slv_rsp[core_v_mini_mcu_pkg::CAMERA_IDX]),
+
+    .cam_pclk_i(camera_pclk_i),
+    .cam_hsync_i(camera_href_i),
+    .cam_vsync_i(camera_vsync_i),
+    .cam_data_i(camera_data_i)
+  );
 % endif
 
 % if len(user_peripheral_domain.get_peripherals()) == 0:
