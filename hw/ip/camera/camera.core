@@ -31,9 +31,9 @@ generate:
       config:           data/camera.hjson
       name:             camera
       rtl_dir:          rtl
-      sw_path:          ../../sw/camera/camera_regs.h
-      doc_path:         ../../docs/camera/camera_regs.md
-      structs_sw_path:  ../../sw/camera/camera_structs.h
+      sw_path:          ../../../sw/device/lib/drivers/camera/camera_regs.h
+      doc_path:         docs/camera_regs.md
+      structs_sw_path:  ../../../sw/device/lib/drivers/camera/camera_structs.h
 
 targets:
   default:

@@ -7,7 +7,7 @@
 package camera_reg_pkg;
 
   // Address widths within the block
-  parameter int BlockAw = 3;
+  parameter int BlockAw = 4;
 
   ////////////////////////////
   // Typedefs for registers //
@@ -40,8 +40,12 @@ package camera_reg_pkg;
   } camera_hw2reg_t;
 
   // Register offsets
-  parameter logic [BlockAw-1:0] CAMERA_CONTROL_OFFSET = 3'h0;
-  parameter logic [BlockAw-1:0] CAMERA_STATUS_OFFSET = 3'h4;
+  parameter logic [BlockAw-1:0] CAMERA_CONTROL_OFFSET = 4'h0;
+  parameter logic [BlockAw-1:0] CAMERA_STATUS_OFFSET = 4'h4;
+
+  // Window parameters
+  parameter logic [BlockAw-1:0] CAMERA_DATA_OFFSET = 4'h8;
+  parameter int unsigned CAMERA_DATA_SIZE = 'h4;
 
   // Register index
   typedef enum int {
