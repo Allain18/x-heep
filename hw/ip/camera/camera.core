@@ -15,8 +15,7 @@ filesets:
       - xheep:util:reg-generator
     files:
     - rtl/camera_if.sv
-    # - rtl/camera_reg_pkg.sv
-    # - rtl/camera_reg_top.sv
+    - rtl/camera_window.sv
     file_type: systemVerilogSource
 
   files_verilator_waiver:

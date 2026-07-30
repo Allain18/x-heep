@@ -33,6 +33,34 @@ module camera_if #(
   camera_reg2hw_t reg2hw;
   camera_hw2reg_t hw2reg;
 
+  reg_req_t fifo_win_h2d;
+  reg_rsp_t fifo_win_d2h;
+
+  // ============== OTHER SIGNALS ==============
+
+  assign hw2reg.status.de = 1;
+  always @(cam_vsync_i) begin
+    hw2reg.status.d = ~cam_vsync_i;
+  end
+
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+
+    end else begin
+
+    end
+  end
+
+  camera_window #(
+      .reg_req_t(reg_req_t),
+      .reg_rsp_t(reg_rsp_t)
+  ) camera_window_i (
+      .win_i  (fifo_win_h2d),
+      .win_o  (fifo_win_d2h),
+      .data_i (32'hA9),
+      .ready_o()
+  );
 
   // ------------------------- Registers
   camera_reg_top #(
@@ -45,6 +73,8 @@ module camera_if #(
       .hw2reg,
       .reg_req_i,
       .reg_rsp_o,
+      .reg_req_win_o(fifo_win_h2d),
+      .reg_rsp_win_i(fifo_win_d2h),
       .devmode_i(1'b0)
   );
 
