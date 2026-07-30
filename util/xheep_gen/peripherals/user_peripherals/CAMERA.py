@@ -1,7 +1,7 @@
 from ..abstractions import UserPeripheral
 
 
-class camera(UserPeripheral):
+class CAMERA(UserPeripheral):
     """
     Camera for image capture.
 
