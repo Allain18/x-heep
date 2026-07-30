@@ -23,11 +23,13 @@ module camera_model #(
   int y;
   int pixel_idx;
   logic byte_sel;
+  logic active;
 
   logic clk_div16;
   logic [2:0] div_cnt;
 
   assign pixel_idx = y * H_ACTIVE + x;
+  assign active = (y < V_ACTIVE) && (x < H_ACTIVE);
 
 
   assign pclk_o = clk_div16;
@@ -52,51 +54,39 @@ module camera_model #(
       x        <= 0;
       y        <= 0;
       byte_sel <= 0;
-      href_o   <= 0;
-      vsync_o  <= 1;
-      data_o   <= 8'h00;
+    end else if (active) begin
+      byte_sel <= ~byte_sel;
+
+      // Advance to next pixel after two bytes
+      if (byte_sel) x <= x + 1;
+
     end else begin
+      byte_sel <= 0;
 
-      //------------------------------------------
-      // Frame timing
-      //------------------------------------------
-      if (y >= V_ACTIVE) begin
-        vsync_o <= 1;
-        href_o  <= 0;
-      end else begin
-        vsync_o <= 0;
+      x <= x + 1;
 
-        if (x < H_ACTIVE) href_o <= 1;
-        else href_o <= 0;
+      if (x == H_ACTIVE + H_BLANK - 1) begin
+        x <= 0;
+        y <= y + 1;
+
+        if (y == V_ACTIVE + V_BLANK - 1) y <= 0;
       end
+    end
+  end
 
-      //------------------------------------------
-      // Pixel generation
-      //------------------------------------------
-      if ((y < V_ACTIVE) && (x < H_ACTIVE)) begin
-        if (!byte_sel) begin
-          data_o <= image_mem[pixel_idx][15:8];
-        end else begin
-          data_o <= image_mem[pixel_idx][7:0];
-        end
+  always_ff @(posedge pclk_o or negedge rst_ni) begin
+    if (~rst_ni) begin
+      href_o  <= 0;
+      vsync_o <= 1;
+      data_o  <= 8'h00;
+    end else begin
+      vsync_o <= (y >= V_ACTIVE);
+      href_o  <= active;
 
-        byte_sel <= ~byte_sel;
-
-        // Advance to next pixel after two bytes
-        if (byte_sel) x <= x + 1;
-
+      if (active) begin
+        data_o <= byte_sel ? image_mem[pixel_idx][7:0] : image_mem[pixel_idx][15:8];
       end else begin
         data_o <= 8'h00;
-        byte_sel <= 0;
-
-        x <= x + 1;
-
-        if (x == H_ACTIVE + H_BLANK - 1) begin
-          x <= 0;
-          y <= y + 1;
-
-          if (y == V_ACTIVE + V_BLANK - 1) y <= 0;
-        end
       end
     end
   end
