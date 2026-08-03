@@ -19,7 +19,7 @@
 
 /* By default, PRINTFs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA  1
-#define PRINTF_IN_SIM   1
+#define PRINTF_IN_SIM   0
 
 #if TARGET_SIM && PRINTF_IN_SIM
     #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
@@ -31,6 +31,12 @@
 
 #define PATTERN8 0xA5
 #define PATTERN16 0xA5A5
+
+uint32_t __attribute__((section(".xheep_data_flash_only"))) Avect[] = {1,2,3,4};
+uint32_t __attribute__((section(".xheep_data_flash_only"))) Bvect[] = {6,7,8,9};
+
+uint32_t __attribute__((section(".xheep_data_flash_only"))) Cdotp = 0;
+uint32_t goldC = 1*6 + 2*7 + 3*8 + 4*9;
 
 int main(void)
 {
@@ -50,12 +56,39 @@ int main(void)
         return EXIT_FAILURE;
     }
 
+    //on Flash dotp
+    uint32_t* Cptr = heep_get_flash_address_offset(&Cdotp);
+    uint32_t* Aptr = heep_get_flash_address_offset(Avect);
+    uint32_t* Bptr = heep_get_flash_address_offset(Bvect);
+    if (((uint32_t)(Cptr) & (uint32_t)(base)) != (uint32_t)base)
+        Cptr = (uint32_t*)((uint32_t)(base) + (uint32_t)(Cptr));
+    if (((uint32_t)(Aptr) & (uint32_t)(base)) != (uint32_t)base)
+        Aptr = (uint32_t*)((uint32_t)(base) + (uint32_t)(Aptr));
+    if (((uint32_t)(Bptr) & (uint32_t)(base)) != (uint32_t)base)
+        Bptr = (uint32_t*)((uint32_t)(base) + (uint32_t)(Bptr));
+
+
+    Cptr[0] = 0;
+    for (int i = 0; i < 4; i++) {
+        Cptr[0] += Aptr[i] * Bptr[i];
+    }
+    if(Cptr[0] != goldC) {
+        PRINTF("Dot product calculation failed: expected %d, got %d\n", goldC, Cptr[0]);
+        return EXIT_FAILURE;
+    } else {
+        PRINTF("Dot product calculation succeeded: %d\n", Cptr[0]);
+        return EXIT_SUCCESS;
+    }
+
     uint32_t* heep_data_address = heep_get_flash_address_offset(flash_source_pattern);
 
     if (((uint32_t)(heep_data_address) & (uint32_t)(base)) != (uint32_t)base)
     {
         heep_data_address = (uint32_t*)((uint32_t)(base) + (uint32_t)(heep_data_address));
     }
+
+
+
 
     PRINTF("Memory-mapped SPI flash test\n");
 
