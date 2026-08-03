@@ -56,6 +56,10 @@ int main(void)
         return EXIT_FAILURE;
     }
 
+
+    // Mandatory because w25q128jw_controller_is_ready_polling reset it
+    dma_set_hw_configuration_mode(1,0);
+
     //on Flash dotp
     uint32_t* Cptr = heep_get_flash_address_offset(&Cdotp);
     uint32_t* Aptr = heep_get_flash_address_offset(Avect);
