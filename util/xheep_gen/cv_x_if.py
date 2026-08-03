@@ -5,7 +5,7 @@ class CvXIf:
 
     def __init__(
         self,
-        x_num_rs: int = 2,
+        x_num_rs: int = 3,
         x_id_width: int = 4,
         x_mem_width: int = 32,
         x_rfr_width: int = 32,
