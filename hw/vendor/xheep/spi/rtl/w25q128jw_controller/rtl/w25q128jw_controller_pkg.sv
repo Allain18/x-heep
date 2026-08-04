@@ -35,12 +35,11 @@ package w25q128jw_controller_pkg;
     CHECK_CACHE_RESPONSE
   } check_cache_state_e;
 
-  typedef enum logic [2:0] {
+  typedef enum logic [1:0] {
     READ_CACHE_IDLE,  // Cache request sent
     READ_CACHE_REGS,  // Configure DMA for transfer
     READ_CACHE_TRANS,  // Wait for DMA transfer complete
-    READ_CACHE_MEMIO_REQ,  // memio: registered CACHE_READ valid
-    READ_CACHE_MEMIO  // memio: return from cache
+    READ_CACHE_MEMIO_REQ  // memio: registered CACHE_READ valid
   } read_cache_state_e;
 
   // -------- READ FSM STATES --------

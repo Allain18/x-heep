@@ -520,21 +520,18 @@ module w25q128jw_controller
 
           READ_CACHE_MEMIO_REQ: begin
             cache_req = 1'b1;
-            if (cache_valid) read_cache_state_d = READ_CACHE_MEMIO;
+            if (cache_valid) begin
+              spimemio_resp_o.rdata = cache_rdata;
+              spimemio_resp_o.rvalid = 1'b1;
+
+              // Clear memio flag and finish transaction
+              memio_state_d = MEMIO_IDLE;
+              memio_addr_d = 'h0;
+              memio_be_d = 4'h0;
+              read_cache_state_d = READ_CACHE_IDLE;
+              top_state_d = TOP_DONE;
+            end
           end
-
-          READ_CACHE_MEMIO: begin
-            spimemio_resp_o.rdata = cache_rdata;
-            spimemio_resp_o.rvalid = 1'b1;
-
-            // Clear memio flag and finish transaction
-            memio_state_d = MEMIO_IDLE;
-            memio_addr_d = 'h0;
-            memio_be_d = 4'h0;
-            read_cache_state_d = READ_CACHE_IDLE;
-            top_state_d = TOP_DONE;
-          end
-
 
           default: begin
             read_cache_state_d = READ_CACHE_IDLE;
