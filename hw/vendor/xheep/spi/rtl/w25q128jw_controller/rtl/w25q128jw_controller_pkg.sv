@@ -30,12 +30,9 @@ package w25q128jw_controller_pkg;
 
   // -------- CHECK_CACHE FSM STATES --------
   // Check if requested data is already in cache (cache hit) or not (cache miss)
-  typedef enum logic [2:0] {
+  typedef enum logic [1:0] {
     CHECK_CACHE_IDLE,
-    CHECK_CACHE_RESPONSE,
-    CHECK_CACHE_HIT,
-    CHECK_CACHE_MISS_CLEAN,
-    CHECK_CACHE_MISS_DIRTY
+    CHECK_CACHE_RESPONSE
   } check_cache_state_e;
 
   typedef enum logic [2:0] {

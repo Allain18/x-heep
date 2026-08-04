@@ -30,7 +30,7 @@ module w25q128jw_controller
     parameter int unsigned DMA_CH_NUM = 'd1,
 
     // Cache enable
-    parameter bit CACHE_EN = 1'b0,
+    parameter bit  CACHE_EN  = 1'b0,
     // Register Interface data types
     parameter type reg_req_t = logic,
     parameter type reg_rsp_t = logic,
@@ -397,38 +397,26 @@ module w25q128jw_controller
 
           // -------- RESPONSE: Evaluate Cache response --------
           CHECK_CACHE_RESPONSE: begin
-            if (cache_ctrl_resp.hit) begin
-              check_cache_state_d = CHECK_CACHE_HIT;
-            end else begin
-              if (cache_ctrl_resp.miss_info.dirty) begin
-                check_cache_state_d = CHECK_CACHE_MISS_DIRTY;
+            if (cache_ctrl_resp.hit) begin  //hit
+              if (reg2hw.control.rnw.q || memio_state_q == MEMIO_READ) begin
+                top_state_d = TOP_READ_CACHE;
               end else begin
-                check_cache_state_d = CHECK_CACHE_MISS_CLEAN;
+                top_state_d = TOP_MODIFY;
+              end
+
+              check_cache_state_d = CHECK_CACHE_IDLE;
+            end else begin
+              if (cache_ctrl_resp.miss_info.dirty) begin  // miss dirty
+                // Keep in memory victim to write-back in TOP_ERASE/TOP_WRITE
+                victim_sector_offset_d = cache_ctrl_resp.miss_info.victim_sector_address;
+
+                top_state_d = TOP_ERASE;
+                check_cache_state_d = CHECK_CACHE_IDLE;
+              end else begin  // miss clean
+                top_state_d = TOP_READ;
+                check_cache_state_d = CHECK_CACHE_IDLE;
               end
             end
-          end
-
-          CHECK_CACHE_HIT: begin
-            if (reg2hw.control.rnw.q || memio_state_q == MEMIO_READ) begin
-              top_state_d = TOP_READ_CACHE;
-            end else begin
-              top_state_d = TOP_MODIFY;
-            end
-
-            check_cache_state_d = CHECK_CACHE_IDLE;
-          end
-
-          CHECK_CACHE_MISS_CLEAN: begin
-            top_state_d = TOP_READ;
-            check_cache_state_d = CHECK_CACHE_IDLE;
-          end
-
-          CHECK_CACHE_MISS_DIRTY: begin
-            // Keep in memory victim to write-back in TOP_ERASE/TOP_WRITE
-            victim_sector_offset_d = cache_ctrl_resp.miss_info.victim_sector_address;
-
-            top_state_d = TOP_ERASE;
-            check_cache_state_d = CHECK_CACHE_IDLE;
           end
 
           default: begin
@@ -878,8 +866,11 @@ module w25q128jw_controller
 
               if (CACHE_EN) begin
                 // ===== CACHE FILLED, proceed to CHECK_CACHE (hit) =====
-                top_state_d         = TOP_CHECK_CACHE;
-                check_cache_state_d = CHECK_CACHE_HIT;
+                if (reg2hw.control.rnw.q || memio_state_q == MEMIO_READ) begin
+                  top_state_d = TOP_READ_CACHE;
+                end else begin
+                  top_state_d = TOP_MODIFY;
+                end
               end else if (reg2hw.control.rnw.q) begin
                 top_state_d       = TOP_DONE;
                 dma_init_return_d = RETURN_READ;
@@ -1043,8 +1034,11 @@ module w25q128jw_controller
                   FWAIT_RETURN_IDLE: begin
                     if (CACHE_EN) begin
                       // If cache enabled, after READ: Flash ready -> go to CHECK CACHE (is a hit)
-                      top_state_d = TOP_CHECK_CACHE;
-                      check_cache_state_d = CHECK_CACHE_HIT;
+                      if (reg2hw.control.rnw.q || memio_state_q == MEMIO_READ) begin
+                        top_state_d = TOP_READ_CACHE;
+                      end else begin
+                        top_state_d = TOP_MODIFY;
+                      end
                     end else begin
                       // Otherwise: Flash ready -> go to ERASE (if write operation)
                       fwait_return_d = FWAIT_RETURN_ERASE;
@@ -1074,16 +1068,14 @@ module w25q128jw_controller
                     if (reg2hw.length.q == 0) begin
                       // All sectors done
                       if (memio_state_q != MEMIO_IDLE) begin  //Cache enable
-                        check_cache_state_d = CHECK_CACHE_MISS_CLEAN;
-                        top_state_d         = TOP_CHECK_CACHE;
+                        top_state_d = TOP_READ;
                       end else begin
                         top_state_d = TOP_DONE;
                       end
                     end else begin
                       if (CACHE_EN) begin
                         // Victim cache line is now clean, can now load requested cache line
-                        check_cache_state_d = CHECK_CACHE_MISS_CLEAN;
-                        top_state_d         = TOP_CHECK_CACHE;
+                        top_state_d = TOP_READ;
                       end else begin
                         // More sectors to write
                         top_state_d = TOP_READ;
