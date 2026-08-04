@@ -25,10 +25,6 @@
             num: 1
             type: input
         }
-        execute_from_flash: {
-            num: 1
-            type: input
-        }
         jtag_tck: {
             num: 1
             type: input
