@@ -55,8 +55,8 @@
  *     This test can only be performed on FPGA boards or using QuestaSim, by setting the correct macro (SIM_QUESTASIM).
  *     When executing on QuestaSim, make sure to compile in the correct way:
  *     - Include LINKER=flash_load in "make app ..."
- *     - Add boot_sel and execute_from_flash: 
- *       'make run PLUSARGS="c firmware=../../../sw/build/main.hex boot_sel=1 execute_from_flash=0" '
+ *     - Add boot_sel: 
+ *       'make run PLUSARGS="c firmware=../../../sw/build/main.hex boot_sel=0" '
  *     
  */
 
