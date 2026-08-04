@@ -361,6 +361,18 @@ module w25q128jw_controller
 
           memio_state_d = spimemio_req_i.we ? MEMIO_WRITE : MEMIO_READ;
           top_state_d = TOP_CHECK_CACHE;
+
+          cache_ctrl_req.req = 1'b1;
+          cache_ctrl_req.op  = CACHE_CHECK;
+          if (memio_state_d == MEMIO_IDLE) begin
+            cache_ctrl_req.addr.exposed = {
+              8'h0, (reg2hw.f_address.q + sector_iter_offset_q) & 32'h00ffffff
+            };
+          end else begin
+            cache_ctrl_req.addr.exposed = {8'h0, memio_addr_d & 32'h00ffffff};
+          end
+
+          check_cache_state_d = CHECK_CACHE_RESPONSE;
         end
       end
 
@@ -400,6 +412,24 @@ module w25q128jw_controller
             if (cache_ctrl_resp.hit) begin  //hit
               if (reg2hw.control.rnw.q || memio_state_q == MEMIO_READ) begin
                 top_state_d = TOP_READ_CACHE;
+                // Skip idle, faster
+                // Reset offset for first sector
+                if (sector_iter_offset_q != 32'h0) begin
+                  transfer_byte_offset_d = 12'h0;
+                end
+
+                // Next state after returning from DMA reset
+                if (memio_state_q == MEMIO_IDLE) begin
+                  top_state_d        = TOP_DMA_INIT;
+                  dma_init_return_d  = RETURN_READ_CACHE;
+                  read_cache_state_d = READ_CACHE_REGS;
+                end else begin  // MEMIO_READ
+                  cache_ctrl_req.req = 1'b1;
+                  cache_ctrl_req.op = CACHE_READ;
+                  cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
+
+                  read_cache_state_d = READ_CACHE_MEMIO_REQ;
+                end
               end else begin
                 top_state_d = TOP_MODIFY;
               end
