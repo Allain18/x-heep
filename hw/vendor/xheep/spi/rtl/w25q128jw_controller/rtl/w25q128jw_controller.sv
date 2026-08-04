@@ -428,6 +428,7 @@ module w25q128jw_controller
                   cache_ctrl_req.op = CACHE_READ;
                   cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
 
+                  cache_req = 1'b1;
                   read_cache_state_d = READ_CACHE_MEMIO_REQ;
                 end
               end else begin
@@ -480,6 +481,7 @@ module w25q128jw_controller
               cache_ctrl_req.op = CACHE_READ;
               cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
 
+              cache_req = 1'b1;
               read_cache_state_d = READ_CACHE_MEMIO_REQ;
             end
           end
@@ -549,7 +551,6 @@ module w25q128jw_controller
           end
 
           READ_CACHE_MEMIO_REQ: begin
-            cache_req = 1'b1;
             if (cache_valid) begin
               spimemio_resp_o.rdata = cache_rdata;
               spimemio_resp_o.rvalid = 1'b1;

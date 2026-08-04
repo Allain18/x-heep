@@ -167,11 +167,11 @@ module flash_llc_cache
         default: ;
       endcase
     end else if (mem_man_req_i) begin
-      unique case (active_op_q)
+      unique case (active_op_d)
         CACHE_WRITE: begin
           mem_req   = 1'b1;
           mem_we    = 1'b1;
-          mem_addr  = SramAddrWidth'({target_set_q, word_counter_q});
+          mem_addr  = SramAddrWidth'({target_set_d, word_counter_d});
           mem_wdata = memio_wdata_i;
           mem_be    = memio_be_i;
         end
@@ -179,7 +179,7 @@ module flash_llc_cache
         CACHE_READ: begin
           mem_req  = 1'b1;
           mem_we   = 1'b0;
-          mem_addr = SramAddrWidth'({target_set_q, word_counter_q});
+          mem_addr = SramAddrWidth'({target_set_d, word_counter_d});
           mem_be   = 4'hf;
         end
 
