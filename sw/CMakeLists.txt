@@ -504,7 +504,7 @@ add_custom_command(TARGET ${MAINFILE}.elf POST_BUILD
         COMMENT "Invoking: Disassemble (${CMAKE_OBJDUMP})")
 
 # Post processing command to create a hex file
-if((${LINKER} STREQUAL "flash_load") OR (${LINKER} STREQUAL "flash_exec"))
+if(${LINKER} STREQUAL "flash_load")
     add_custom_command(TARGET ${MAINFILE}.elf POST_BUILD
             COMMAND ${CMAKE_OBJCOPY} -O verilog --adjust-vma=-0x40000000 ${MAINFILE}.elf ${MAINFILE}.hex
             COMMENT "Invoking: Hexdump")
