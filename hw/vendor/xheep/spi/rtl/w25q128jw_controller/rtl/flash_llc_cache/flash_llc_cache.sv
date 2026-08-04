@@ -228,7 +228,6 @@ module flash_llc_cache
 
   // Cache data (SRAM bank)
   sram_wrapper #(
-      // Needeed size is 4096, however, ram size of 8192 are already instanciated, so it's easier to use
       .NumWords (N_WORDS),       // Number of Words in data array
       .DataWidth(WORD_SIZE_BITS)  // Data signal width (in bits)
   ) cache_data (
