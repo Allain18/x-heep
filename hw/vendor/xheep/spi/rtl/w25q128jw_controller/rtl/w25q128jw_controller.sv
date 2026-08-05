@@ -363,7 +363,7 @@ module w25q128jw_controller
           top_state_d = TOP_CHECK_CACHE;
 
           cache_ctrl_req.req = 1'b1;
-          cache_ctrl_req.op  = CACHE_CHECK;
+          cache_ctrl_req.op = CACHE_CHECK;
           cache_ctrl_req.addr.exposed = {8'h0, memio_addr_d & 32'h00ffffff};
 
           check_cache_state_d = CHECK_CACHE_RESPONSE;
@@ -427,6 +427,13 @@ module w25q128jw_controller
                 end
               end else begin
                 top_state_d = TOP_MODIFY;
+                cache_ctrl_req.req = 1'b1;
+                cache_ctrl_req.op = CACHE_WRITE;
+                cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
+                cache_ctrl_req.dirty = 1'b1;
+
+                cache_req = 1'b1;
+                modify_state_d = MODIFY_MEMIO_REQ;
               end
 
               check_cache_state_d = CHECK_CACHE_IDLE;
@@ -554,7 +561,7 @@ module w25q128jw_controller
               memio_addr_d = 'h0;
               memio_be_d = 4'h0;
               read_cache_state_d = READ_CACHE_IDLE;
-              top_state_d = TOP_IDLE; // Skip TOP_DONE
+              top_state_d = TOP_IDLE;  // Skip TOP_DONE
             end
           end
 
@@ -1304,6 +1311,7 @@ module w25q128jw_controller
               cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
               cache_ctrl_req.dirty = 1'b1;
 
+              cache_req = 1'b1;
               modify_state_d = MODIFY_MEMIO_REQ;
             end
           end
@@ -1393,19 +1401,16 @@ module w25q128jw_controller
           end
 
           MODIFY_MEMIO_REQ: begin
-            cache_req = 1'b1;
-            if (cache_valid) modify_state_d = MODIFY_MEMIO;
-          end
+            if (cache_valid) begin
+              spimemio_resp_o.rdata = memio_data_q;
+              spimemio_resp_o.rvalid = 1'b1;
 
-          MODIFY_MEMIO: begin
-            spimemio_resp_o.rdata = memio_data_q;
-            spimemio_resp_o.rvalid = 1'b1;
-
-            // Clear memio flag and finish transaction
-            memio_state_d = MEMIO_IDLE;
-            memio_be_d = 4'h0;
-            modify_state_d = MODIFY_IDLE;
-            top_state_d = TOP_DONE;
+              // Clear memio flag and finish transaction
+              memio_state_d = MEMIO_IDLE;
+              memio_be_d = 4'h0;
+              modify_state_d = MODIFY_IDLE;
+              top_state_d = TOP_DONE;
+            end
           end
 
           default: begin
