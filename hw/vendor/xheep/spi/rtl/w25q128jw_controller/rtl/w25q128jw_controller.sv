@@ -172,8 +172,8 @@ module w25q128jw_controller
 
   // memio fast-path
   logic [31:0] memio_addr_q, memio_addr_d;
-  logic [31:0] memio_data_q, memio_data_d;
-  logic [3:0] memio_be_q, memio_be_d;
+  logic [31:0] memio_data;
+  logic [3:0] memio_be;
   logic [31:0] memio_write_offset_q, memio_write_offset_d;
   memio_state_e memio_state_q, memio_state_d;
 
@@ -210,9 +210,7 @@ module w25q128jw_controller
       spi_control_q <= 32'h0;
       dma_size_q <= 32'h0;
       memio_addr_q <= 32'h0;
-      memio_data_q <= 32'h0;
       memio_state_q <= MEMIO_IDLE;
-      memio_be_q <= 4'h0;
       memio_write_offset_q <= 32'h0;
 
       if (CACHE_EN) begin
@@ -245,9 +243,7 @@ module w25q128jw_controller
       read_remaining_bytes_q <= read_remaining_bytes_d;
       spi_control_q <= spi_control_d;
       memio_addr_q <= memio_addr_d;
-      memio_data_q <= memio_data_d;
       memio_state_q <= memio_state_d;
-      memio_be_q <= memio_be_d;
       memio_write_offset_q <= memio_write_offset_d;
 
       dma_size_q <= dma_size_d;
@@ -287,9 +283,7 @@ module w25q128jw_controller
     read_remaining_bytes_d = read_remaining_bytes_q;
     spi_control_d = spi_control_q;
     memio_addr_d = memio_addr_q;
-    memio_data_d = memio_data_q;
     memio_state_d = memio_state_q;
-    memio_be_d = memio_be_q;
     memio_write_offset_d = memio_write_offset_q;
 
     dma_size_d = dma_size_q;
@@ -355,8 +349,8 @@ module w25q128jw_controller
           end
         end else if (CACHE_EN && spimemio_req_i.req) begin
           memio_addr_d = spimemio_req_i.addr;
-          memio_data_d = spimemio_req_i.wdata;
-          memio_be_d = spimemio_req_i.be;
+          memio_data = spimemio_req_i.wdata;
+          memio_be = spimemio_req_i.be;
           spimemio_resp_o.gnt = 1'b1;
 
           memio_state_d = spimemio_req_i.we ? MEMIO_WRITE : MEMIO_READ;
@@ -366,7 +360,43 @@ module w25q128jw_controller
           cache_ctrl_req.op = CACHE_CHECK;
           cache_ctrl_req.addr.exposed = {8'h0, memio_addr_d & 32'h00ffffff};
 
-          check_cache_state_d = CHECK_CACHE_RESPONSE;
+          if (cache_ctrl_resp.hit) begin  //hit
+            if (memio_state_d == MEMIO_READ) begin
+              top_state_d = TOP_READ_CACHE;
+              // Reset offset for first sector
+              if (sector_iter_offset_q != 32'h0) begin
+                transfer_byte_offset_d = 12'h0;
+              end
+              cache_ctrl_req.req = 1'b1;
+              cache_ctrl_req.op = CACHE_READ;
+              cache_ctrl_req.addr.exposed = {memio_addr_d & 32'h00ffffff};
+
+              cache_req = 1'b1;
+              read_cache_state_d = READ_CACHE_MEMIO_REQ;
+
+            end else begin
+              top_state_d = TOP_MODIFY;
+              cache_ctrl_req.req = 1'b1;
+              cache_ctrl_req.op = CACHE_WRITE;
+              cache_ctrl_req.addr.exposed = {memio_addr_d & 32'h00ffffff};
+              cache_ctrl_req.dirty = 1'b1;
+
+              cache_req = 1'b1;
+              modify_state_d = MODIFY_MEMIO_REQ;  // MEMIO Write
+            end
+
+          end else begin
+            if (cache_ctrl_resp.miss_info.dirty) begin  // miss dirty
+              // Keep in memory victim to write-back in TOP_ERASE/TOP_WRITE
+              victim_sector_offset_d = cache_ctrl_resp.miss_info.victim_sector_address;
+
+              top_state_d = TOP_ERASE;
+              check_cache_state_d = CHECK_CACHE_IDLE;
+            end else begin  // miss clean
+              top_state_d = TOP_READ;
+              check_cache_state_d = CHECK_CACHE_IDLE;
+            end
+          end
         end
       end
 
@@ -398,11 +428,6 @@ module w25q128jw_controller
               cache_ctrl_req.addr.exposed = {8'h0, memio_addr_q & 32'h00ffffff};
             end
 
-            check_cache_state_d = CHECK_CACHE_RESPONSE;
-          end
-
-          // -------- RESPONSE: Evaluate Cache response --------
-          CHECK_CACHE_RESPONSE: begin
             if (cache_ctrl_resp.hit) begin  //hit
               if (reg2hw.control.rnw.q || memio_state_q == MEMIO_READ) begin
                 top_state_d = TOP_READ_CACHE;
@@ -563,7 +588,7 @@ module w25q128jw_controller
               // Clear memio flag and finish transaction
               memio_state_d = MEMIO_IDLE;
               memio_addr_d = 'h0;
-              memio_be_d = 4'h0;
+              memio_be = 4'h0;
               read_cache_state_d = READ_CACHE_IDLE;
               top_state_d = TOP_IDLE;  // Skip TOP_DONE
             end
@@ -1406,14 +1431,14 @@ module w25q128jw_controller
 
           MODIFY_MEMIO_REQ: begin
             if (cache_valid) begin
-              spimemio_resp_o.rdata = memio_data_q;
+              spimemio_resp_o.rdata = memio_data;
               spimemio_resp_o.rvalid = 1'b1;
 
               // Clear memio flag and finish transaction
               memio_state_d = MEMIO_IDLE;
-              memio_be_d = 4'h0;
+              memio_be = 4'h0;
               modify_state_d = MODIFY_IDLE;
-              top_state_d = TOP_DONE;
+              top_state_d = TOP_IDLE;
             end
           end
 
@@ -1859,8 +1884,8 @@ module w25q128jw_controller
           .controller_req_i (cache_ctrl_req),
           .controller_resp_o(cache_ctrl_resp),
           .mem_man_req_i    (cache_req),
-          .memio_wdata_i    (memio_data_q),
-          .memio_be_i       (memio_be_q),
+          .memio_wdata_i    (memio_data),
+          .memio_be_i       (memio_be),
           .valid_bridge_o   (cache_valid),
           .mem_rdata_o      (cache_rdata)
       );
@@ -1913,7 +1938,5 @@ module w25q128jw_controller
       endcase
     end
   end
-
-
 
 endmodule
