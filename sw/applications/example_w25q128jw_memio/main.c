@@ -38,6 +38,15 @@ uint32_t __attribute__((section(".xheep_data_flash_only"))) Bvect[] = {6,7,8,9};
 uint32_t __attribute__((section(".xheep_data_flash_only"))) Cdotp = 0;
 uint32_t goldC = 1*6 + 2*7 + 3*8 + 4*9;
 
+void __attribute__ ((noinline)) dot_product(uint32_t *  A, uint32_t *  B, uint32_t *  C, int N)
+{
+    uint32_t acc = 0;
+    for(int i = 0; i < N; i++)
+        acc+= A[i] * B[i];
+
+    *C = acc;
+}
+
 int main(void)
 {
     uint32_t v32;
@@ -71,11 +80,8 @@ int main(void)
     if (((uint32_t)(Bptr) & (uint32_t)(base)) != (uint32_t)base)
         Bptr = (uint32_t*)((uint32_t)(base) + (uint32_t)(Bptr));
 
+    dot_product(Aptr, Bptr, Cptr, 4);
 
-    Cptr[0] = 0;
-    for (int i = 0; i < 4; i++) {
-        Cptr[0] += Aptr[i] * Bptr[i];
-    }
     if(Cptr[0] != goldC) {
         PRINTF("Dot product calculation failed: expected %d, got %d\n", goldC, Cptr[0]);
         return EXIT_FAILURE;
@@ -90,8 +96,6 @@ int main(void)
     {
         heep_data_address = (uint32_t*)((uint32_t)(base) + (uint32_t)(heep_data_address));
     }
-
-
 
 
     PRINTF("Memory-mapped SPI flash test\n");
