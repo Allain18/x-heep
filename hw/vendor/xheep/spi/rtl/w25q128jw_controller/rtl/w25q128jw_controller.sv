@@ -560,7 +560,7 @@ module w25q128jw_controller
               memio_addr_d = 'h0;
               memio_be_d = 4'h0;
               read_cache_state_d = READ_CACHE_IDLE;
-              top_state_d = TOP_DONE;
+              top_state_d = TOP_IDLE; // Skip TOP_DONE
             end
           end
 
