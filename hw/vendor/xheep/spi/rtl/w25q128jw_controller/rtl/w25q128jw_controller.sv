@@ -364,13 +364,7 @@ module w25q128jw_controller
 
           cache_ctrl_req.req = 1'b1;
           cache_ctrl_req.op  = CACHE_CHECK;
-          if (memio_state_d == MEMIO_IDLE) begin
-            cache_ctrl_req.addr.exposed = {
-              8'h0, (reg2hw.f_address.q + sector_iter_offset_q) & 32'h00ffffff
-            };
-          end else begin
-            cache_ctrl_req.addr.exposed = {8'h0, memio_addr_d & 32'h00ffffff};
-          end
+          cache_ctrl_req.addr.exposed = {8'h0, memio_addr_d & 32'h00ffffff};
 
           check_cache_state_d = CHECK_CACHE_RESPONSE;
         end
