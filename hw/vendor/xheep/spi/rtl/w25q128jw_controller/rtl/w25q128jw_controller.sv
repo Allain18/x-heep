@@ -432,8 +432,12 @@ module w25q128jw_controller
                 cache_ctrl_req.addr.exposed = {memio_addr_q & 32'h00ffffff};
                 cache_ctrl_req.dirty = 1'b1;
 
-                cache_req = 1'b1;
-                modify_state_d = MODIFY_MEMIO_REQ;
+                if (memio_state_q == MEMIO_WRITE) begin
+                  cache_req = 1'b1;
+                  modify_state_d = MODIFY_MEMIO_REQ;
+                end else begin
+                  modify_state_d = MODIFY_IDLE;
+                end
               end
 
               check_cache_state_d = CHECK_CACHE_IDLE;
