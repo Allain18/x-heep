@@ -17,10 +17,10 @@ module flash_llc_cache_way
     input logic clk_i,
     input logic rst_ni,
 
-    cache_op_e active_op_i,
-    logic [N_SETS_WIDTH-1:0] current_set_i,
-    input [TAG_WIDTH-1:0] current_tag_i,
-    input  logic                            request_dirty_i, // Only valid for WRITE, indicates whether the sector being written is dirty or clean
+    input cache_op_e active_op_i,
+    input logic [N_SETS_WIDTH-1:0] current_set_i,
+    input logic [TAG_WIDTH-1:0] current_tag_i,
+    input logic request_dirty_i, // Only valid for WRITE, indicates whether the sector being written is dirty or clean
     input logic last_sector_word_i,
 
     output logic                            hit_o,
