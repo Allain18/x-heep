@@ -65,7 +65,7 @@ int main(void)
         return EXIT_FAILURE;
     }
 
-
+    PRINTF("Memory-mapped SPI flash test\n");
     // Mandatory because w25q128jw_controller_is_ready_polling reset it
     dma_set_hw_configuration_mode(1,0);
 
@@ -87,7 +87,6 @@ int main(void)
         return EXIT_FAILURE;
     } else {
         PRINTF("Dot product calculation succeeded: %d\n", Cptr[0]);
-        return EXIT_SUCCESS;
     }
 
     uint32_t* heep_data_address = heep_get_flash_address_offset(flash_source_pattern);
@@ -96,9 +95,6 @@ int main(void)
     {
         heep_data_address = (uint32_t*)((uint32_t)(base) + (uint32_t)(heep_data_address));
     }
-
-
-    PRINTF("Memory-mapped SPI flash test\n");
 
     PRINTF("Write bytes at sector 0...\n");
     // Using the controller to write data from SRAM to flash
