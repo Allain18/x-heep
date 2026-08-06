@@ -18,6 +18,15 @@ module flash_llc_cache_way
     input logic rst_ni,
 
     input cache_op_e active_op_i,
+
+    // Lookup index: address currently *presented* by the controller. The metadata is
+    // combinational on it so hit/dirty/victim are answered in the same cycle the request
+    // is issued, before the address is registered.
+    input logic [N_SETS_WIDTH-1:0] lookup_set_i,
+    input logic [TAG_WIDTH-1:0] lookup_tag_i,
+
+    // Update index: address of the operation currently in flight (registered), used to
+    // update the metadata when the operation completes.
     input logic [N_SETS_WIDTH-1:0] current_set_i,
     input logic [TAG_WIDTH-1:0] current_tag_i,
     input logic request_dirty_i, // Only valid for WRITE, indicates whether the sector being written is dirty or clean
@@ -32,9 +41,11 @@ module flash_llc_cache_way
   logic [N_SETS-1:0] dirty;
   logic [TAG_WIDTH-1:0] tags[N_SETS-1:0];
 
-  logic hit;
+  logic lookup_hit;
+  logic update_hit;
 
-  assign hit = valid[current_set_i] & (tags[current_set_i] == current_tag_i);
+  assign lookup_hit = valid[lookup_set_i] & (tags[lookup_set_i] == lookup_tag_i);
+  assign update_hit = valid[current_set_i] & (tags[current_set_i] == current_tag_i);
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -55,7 +66,7 @@ module flash_llc_cache_way
 
         CACHE_EVICT: begin
           // Sector is evicted (not valid)
-          if (hit) begin
+          if (update_hit) begin
             valid[current_set_i] <= 1'b0;
           end
         end
@@ -65,8 +76,8 @@ module flash_llc_cache_way
     end
   end
 
-  assign hit_o = hit;
-  assign dirty_o = dirty[current_set_i];
-  assign victim_sector_o = {tags[current_set_i], current_set_i};
+  assign hit_o = lookup_hit;
+  assign dirty_o = dirty[lookup_set_i];
+  assign victim_sector_o = {tags[lookup_set_i], lookup_set_i};
 
 endmodule

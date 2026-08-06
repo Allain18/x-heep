@@ -32,6 +32,12 @@ module flash_llc_cache
     input  cache_req_t controller_req_i,
     output cache_res_t controller_resp_o,
 
+    // Address the hit/miss lookup (`controller_resp_o`) is answered for. It is answered
+    // combinationally, so the controller can decide hit vs miss in the very cycle it
+    // issues its request. It MUST be driven from registered state / module inputs only,
+    // never from `controller_resp_o`, otherwise a combinational loop is created.
+    input addr_t lookup_addr_i,
+
     input  logic  mem_man_req_i,
     input  be_t   memio_be_i,
     input  data_t memio_wdata_i,
@@ -209,6 +215,8 @@ module flash_llc_cache
       .rst_ni(rst_ni),
 
       .active_op_i(active_op_q),
+      .lookup_set_i(lookup_addr_i.internal.set),
+      .lookup_tag_i(lookup_addr_i.internal.tag),
       .current_set_i(target_set_q),
       .current_tag_i(target_tag_q),
       .request_dirty_i(target_dirty_q),
