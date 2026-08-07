@@ -7,7 +7,7 @@
 
   upstream: {
     url: "https://github.com/x-heep/xheep_spi.git",
-    rev: "a6d6ba0b6848ea41cb66f46ac2dfa11cad1611a9",
+    rev: "872339435dcbad6eb92937b3398f95dcb8553489",
   },
 
   exclude_from_upstream: [
