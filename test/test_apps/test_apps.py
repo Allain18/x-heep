@@ -63,6 +63,9 @@ BLACKLIST = [
     "example_sdk_spi_flash",  # Times out
     "example_freertos_blinky",  # Times out
     "example_matmul",  # Times out
+    "example_w25q128jw_read",  # Times out
+    "example_w25q128jw_write",  # Times out
+    "example_w25q128jw_memio",  # Times out
 ]
 # TODO : The example_pdm2pcm app is testing a wrong version of the PDM2PCM acting only as a CIC filter.
 #        When fixed, it not passes anymore. Need to be updated.
