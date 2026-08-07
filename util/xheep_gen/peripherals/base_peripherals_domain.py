@@ -1,15 +1,11 @@
-<<<<<<< HEAD
-# Base Peripherals (mandatory peripherals)
-from bus_type import BusType
-=======
 # Copyright 2026 EPFL
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Author(s): Pacsort17, marinPh, David Mallasén
 # Description: Base Peripherals (mandatory, always-on peripherals)
->>>>>>> main
 
+from bus_type import BusType
 from .abstractions import BasePeripheral, PeripheralDomain
 from copy import deepcopy
 
@@ -22,12 +18,7 @@ from .base_peripherals import (
     RV_timer_ao,
     Fast_intr_ctrl,
     Ext_peripheral,
-<<<<<<< HEAD
     W25Q128JW_Controller,
-    Pad_control,
-    GPIO_ao,
-=======
->>>>>>> main
 )
 
 
@@ -135,7 +126,6 @@ class BasePeripheralDomain(PeripheralDomain):
 
         raise ValueError("No Power_manager peripheral found")
 
-<<<<<<< HEAD
     def get_W25Q128JW_controller(self):
         """
         Get the W25Q128JW_Controller peripheral.
@@ -149,19 +139,13 @@ class BasePeripheralDomain(PeripheralDomain):
 
         raise ValueError("No W25Q128JW_Controller peripheral found")
 
-    def validate(self, bus_type: BusType = None):
-        """
-        Validate the base peripheral domain. Checks if all base peripherals are added, if they don't
-        overlap and if their configuration paths are valid. Checks also if dmas are valid.
-        :param BusType bus_type: The bus type of the peripheral domain.
-=======
-    def validate(self, address_length: int):
+    def validate(self, address_length: int, bus_type: BusType = None):
         """
         Validate the base peripheral domain. Checks if all base peripherals are added, if they don't
         overlap and if their configuration paths are valid. Checks also if dmas are valid.
 
         :param int address_length: The length of the address space of the peripheral domain.
->>>>>>> main
+        :param BusType bus_type: The bus type of the system.
         """
         for dma in self.get_all_dmas():
             dma.validate()

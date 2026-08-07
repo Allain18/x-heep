@@ -391,17 +391,14 @@ class XHeep:
         self.address_map().validate()
 
         if self.are_base_peripherals_configured():
-<<<<<<< HEAD
-            self._base_peripheral_domain.validate(self._bus_type)
-=======
             self._base_peripheral_domain.validate(
-                self.address_map().get_region("base_peripheral_domain").get_length()
+                self.address_map().get_region("base_peripheral_domain").get_length(),
+                self._bus_type,
             )
         else:
             raise RuntimeError(
                 "[MCU-GEN] ERROR: Base peripheral domain must be configured"
             )
->>>>>>> main
         if self.are_user_peripherals_configured():
             self._user_peripheral_domain.validate(
                 self.address_map().get_region("user_peripheral_domain").get_length()
