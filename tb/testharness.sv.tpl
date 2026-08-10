@@ -28,13 +28,11 @@ module testharness #(
     input  wire         clk_i,
     input  wire         rst_ni,
     input  wire         boot_select_i,
-    input  wire         execute_from_flash_i,
     output wire         exit_valid_o,
 `else  // VERILATOR
     inout  wire         clk_i,
     inout  wire         rst_ni,
     inout  wire         boot_select_i,
-    inout  wire         execute_from_flash_i,
     inout  wire         exit_valid_o,
 `endif  // VERILATOR
     output logic [31:0] exit_value_o,
@@ -92,7 +90,6 @@ module testharness #(
   wire clk;
   wire rst_n;
   wire boot_select;
-  wire execute_from_flash;
   wire exit_valid;
 
   // UART
@@ -170,22 +167,21 @@ module testharness #(
   fifo_req_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_req;
   fifo_rsp_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_resp;
 
-
   wire [serial_link_single_channel_reg_pkg::NumChannels-1:0] ddr_clk_o_xheep;
   wire [serial_link_single_channel_reg_pkg::NumChannels-1:0] ddr_clk_i_xheep;
-  % if user_peripheral_domain.contains_peripheral('serial_link'):
-  wire [serial_link_single_channel_reg_pkg::NumChannels-1:0][serial_link_minimum_axi_pkg::NumLanes-1:0] ddr_i_xheep;
-  wire [serial_link_single_channel_reg_pkg::NumChannels-1:0][serial_link_minimum_axi_pkg::NumLanes-1:0] ddr_o_xheep;
-  assign ddr_o_xheep[0][0] = gpio[7];
-  assign ddr_o_xheep[0][1] = gpio[8];
-  assign ddr_o_xheep[0][2] = gpio[9];
-  assign ddr_o_xheep[0][3] = gpio[10];
+  % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
+    wire [serial_link_single_channel_reg_pkg::NumChannels-1:0][serial_link_minimum_axi_pkg::NumLanes-1:0] ddr_i_xheep;
+    wire [serial_link_single_channel_reg_pkg::NumChannels-1:0][serial_link_minimum_axi_pkg::NumLanes-1:0] ddr_o_xheep;
+    assign ddr_o_xheep[0][0] = gpio[7];
+    assign ddr_o_xheep[0][1] = gpio[8];
+    assign ddr_o_xheep[0][2] = gpio[9];
+    assign ddr_o_xheep[0][3] = gpio[10];
 
-  assign gpio[1] = ddr_i_xheep[0][0];
-  assign gpio[2] = ddr_i_xheep[0][1];
-  assign gpio[3] = ddr_i_xheep[0][2];
-  assign gpio[6] = ddr_i_xheep[0][3];
-  %endif
+    assign gpio[1] = ddr_i_xheep[0][0];
+    assign gpio[2] = ddr_i_xheep[0][1];
+    assign gpio[3] = ddr_i_xheep[0][2];
+    assign gpio[6] = ddr_i_xheep[0][3];
+  % endif
 
   reg_req_t [testharness_pkg::EXT_NPERIPHERALS-1:0] ext_periph_slv_req;
   reg_rsp_t [testharness_pkg::EXT_NPERIPHERALS-1:0] ext_periph_slv_rsp;
@@ -271,7 +267,6 @@ module testharness #(
   assign clk = clk_i;
   assign rst_n = rst_ni;
   assign boot_select = boot_select_i;
-  assign execute_from_flash = execute_from_flash_i;
   assign exit_valid_o = exit_valid;
 
   // X-HEEP system instance
@@ -295,7 +290,6 @@ module testharness #(
       .jtag_tdi_i(mux_jtag_tdi),
       .jtag_tdo_o(mux_jtag_tdo),
       .boot_select_i(boot_select),
-      .execute_from_flash_i(execute_from_flash),
       .exit_valid_o(exit_valid),
       .uart_rx_i(uart_rx),
       .uart_tx_o(uart_tx),
@@ -391,6 +385,11 @@ module testharness #(
       .intr_ext_peripheral_i(gpio[31]),
       .hw_fifo_done_i({{(core_v_mini_mcu_pkg::DMA_CH_NUM - 1) {1'b0}}, dlc_done}),
       .dma_done_o(dma_busy)
+      % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
+        ,
+        .serial_link_direct_write_req_o(),
+        .serial_link_direct_write_resp_i('0)
+      % endif
   );
 
   // Testbench external bus
@@ -820,34 +819,40 @@ module testharness #(
 
       end
 
-      % if user_peripheral_domain.contains_peripheral('serial_link'):
-      serial_link_xheep_wrapper #(
-          .MaxClkDiv(32),
-          .DataWidth(32)
-      ) serial_link_xheep_wrapper_i (
-          .clk_i,
-          .rst_ni,
-          .clk_reg_i     (clk_i),
-          .rst_reg_ni    (rst_ni),
-          .testmode_i    ('0),
-          .writer_req_i  (ext_slave_req[testharness_pkg::SL_EXT_IDX]),
-          .writer_rsp_i  (ext_slave_resp[testharness_pkg::SL_EXT_IDX]),
-          .reader_req_i  ('0),
-          .reader_resp_o(),
-          .cfg_req_i     (ext_periph_slv_req[testharness_pkg::SL_REG_IDX]),
-          .cfg_rsp_o     (ext_periph_slv_rsp[testharness_pkg::SL_REG_IDX]),
-          .ddr_i         (ddr_o_xheep),
-          .ddr_rcv_clk_i (ddr_clk_o_xheep),
-          .ddr_snd_clk_o (ddr_clk_i_xheep),
-          .ddr_o         (ddr_i_xheep)
-      );
-    %else:
-    assign ddr_clk_i_xheep='0;
-    assign gpio[1] = '0;
-    assign gpio[2] = '0;
-    assign gpio[3] = '0;
-    assign gpio[6] = '0;
-    %endif
+      % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
+        serial_link_xheep_wrapper #(
+            .MaxClkDiv(1024),
+            .AddrWidth(32),
+            .DataWidth(32),
+            .AxiAddrOffset(testharness_pkg::SL_EXT_START_ADDRESS)
+        ) serial_link_xheep_wrapper_i (
+            .clk_i,
+            .rst_ni,
+            .clk_reg_i     (clk_i),
+            .rst_reg_ni    (rst_ni),
+            .testmode_i    ('0),
+            .writer_req_i  (ext_slave_req[testharness_pkg::SL_EXT_IDX]),
+            .writer_rsp_i  (ext_slave_resp[testharness_pkg::SL_EXT_IDX]),
+            .reader_req_i  ('0),
+            .reader_resp_o(),
+            .cfg_req_i    (ext_periph_slv_req[testharness_pkg::SL_REG_IDX]),
+            .cfg_rsp_o    (ext_periph_slv_rsp[testharness_pkg::SL_REG_IDX]),
+            .wrapper_cfg_req_i('0),
+            .wrapper_cfg_rsp_o(),
+            .direct_write_req_o(/* unused */),
+            .direct_write_resp_i('0),
+            .ddr_i        (ddr_o_xheep),
+            .ddr_rcv_clk_i (ddr_clk_o_xheep),
+            .ddr_snd_clk_o (ddr_clk_i_xheep),
+            .ddr_o        (ddr_i_xheep)
+        );
+      % else:
+        assign ddr_clk_i_xheep='0;
+        assign gpio[1] = '0;
+        assign gpio[2] = '0;
+        assign gpio[3] = '0;
+        assign gpio[6] = '0;
+      % endif
 
     end else begin : gen_DONT_USE_EXTERNAL_DEVICE_EXAMPLE
       assign slow_ram_slave_resp[0].gnt = '0;

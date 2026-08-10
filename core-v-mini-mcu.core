@@ -25,9 +25,7 @@ filesets:
     - lowrisc:ip:rv_timer:0.1
     - lowrisc:ip:spi_host:1.0
     - lowrisc:ip:i2c:0.1
-    - yosyshq:picorv32_spimemio:0-r1
     - x-heep:ip:cv32e40px
-    - x-heep:ip:obi_spimemio
     - x-heep:ip:boot_rom
     - x-heep:ip:dma
     - x-heep:ip:dma_subsystem
@@ -83,7 +81,6 @@ filesets:
     files:
     - hw/core-v-mini-mcu/core_v_mini_mcu.vlt
     - hw/ip/soc_ctrl/soc_ctrl.vlt
-    - hw/ip/obi_spimemio/obi_spimemio.vlt
     - hw/ip/dma_subsystem/dma_subsystem.vlt
     - hw/ip/pdm2pcm/pdm2pcm.vlt
     - hw/ip/power_manager/power_manager.vlt
@@ -390,6 +387,9 @@ targets:
           - '-CFLAGS "-Wall -fpermissive"'
           - '-LDFLAGS "-pthread -lutil -lelf"'
           - "-Wall"
+        make_options:
+          # Use the number of available cores (up to a max of 8) for parallel compilation, with a fallback to 4 if nproc is not available
+          - '-j$(shell N=$$(nproc 2>/dev/null || echo 4); [ "$$N" -le 8 ] && echo "$$N" || echo 8)'
 
   sim_sc:
     <<: *default_target

@@ -29,7 +29,6 @@ module core_v_mini_mcu #(
     input  logic rst_ni,
     input  logic clk_i,
     input  logic boot_select_i,
-    input  logic execute_from_flash_i,
     input  logic jtag_tck_i,
     input  logic jtag_tms_i,
     input  logic jtag_trst_ni,
@@ -341,6 +340,7 @@ module core_v_mini_mcu #(
   obi_req_t [1:0] dma_addr_req;
   obi_rsp_t [1:0] dma_addr_resp;
 
+
   // ram signals
   obi_req_t [core_v_mini_mcu_pkg::NUM_BANKS-1:0] ram_slave_req;
   obi_rsp_t [core_v_mini_mcu_pkg::NUM_BANKS-1:0] ram_slave_resp;
@@ -434,6 +434,18 @@ module core_v_mini_mcu #(
   assign memory_subsystem_banks_powergate_iso_n[1] = memory_subsystem_pwr_ctrl_out[1].isogate_en_n;
   assign memory_subsystem_banks_set_retentive_n[1] = memory_subsystem_pwr_ctrl_out[1].retentive_en_n;
   assign memory_subsystem_clkgate_en_n[1] = memory_subsystem_pwr_ctrl_out[1].clkgate_en_n;
+  assign memory_subsystem_banks_powergate_switch_n[2] = memory_subsystem_pwr_ctrl_out[2].pwrgate_en_n;
+  assign memory_subsystem_pwr_ctrl_in[2].pwrgate_ack_n = memory_subsystem_banks_powergate_switch_ack_n[2];
+  //isogate exposed outside for UPF sim flow and switch cells
+  assign memory_subsystem_banks_powergate_iso_n[2] = memory_subsystem_pwr_ctrl_out[2].isogate_en_n;
+  assign memory_subsystem_banks_set_retentive_n[2] = memory_subsystem_pwr_ctrl_out[2].retentive_en_n;
+  assign memory_subsystem_clkgate_en_n[2] = memory_subsystem_pwr_ctrl_out[2].clkgate_en_n;
+  assign memory_subsystem_banks_powergate_switch_n[3] = memory_subsystem_pwr_ctrl_out[3].pwrgate_en_n;
+  assign memory_subsystem_pwr_ctrl_in[3].pwrgate_ack_n = memory_subsystem_banks_powergate_switch_ack_n[3];
+  //isogate exposed outside for UPF sim flow and switch cells
+  assign memory_subsystem_banks_powergate_iso_n[3] = memory_subsystem_pwr_ctrl_out[3].isogate_en_n;
+  assign memory_subsystem_banks_set_retentive_n[3] = memory_subsystem_pwr_ctrl_out[3].retentive_en_n;
+  assign memory_subsystem_clkgate_en_n[3] = memory_subsystem_pwr_ctrl_out[3].clkgate_en_n;
 
   for (genvar i = 0; i < EXT_DOMAINS_RND; i = i + 1) begin : gen_external_subsystem_pwr_gating
     assign external_subsystem_powergate_switch_no[i]        = external_subsystem_pwr_ctrl_out[i].pwrgate_en_n;
@@ -611,7 +623,6 @@ module core_v_mini_mcu #(
       .ao2spc_resp_o(ext_ao_peripheral_slave_resp_o),
       .xheep_instance_id_i,
       .boot_select_i,
-      .execute_from_flash_i,
       .exit_valid_o,
       .exit_value_o,
       .spimemio_req_i(flash_mem_slave_req),

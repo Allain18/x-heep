@@ -16,7 +16,6 @@
 
   clk_module = next((p for p in xheep.get_padring().get_connected_pins() if p.name in ["clk", "ref_clk"] ), None).module
   rst_module = next((p for p in xheep.get_padring().get_connected_pins() if p.name == "rst"), None).module
-
 %>
 
 module core_v_mini_mcu #(
@@ -126,6 +125,11 @@ module core_v_mini_mcu #(
     output logic [EXT_DOMAINS_RND-1:0] external_subsystem_clkgate_en_no,
 
     output logic [31:0] exit_value_o,
+    % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
+      // Serial Link
+      output obi_req_t serial_link_direct_write_req_o,   
+      input  obi_rsp_t serial_link_direct_write_resp_i, 
+    % endif
 
     // External SPC interface
     input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_tx_i,
@@ -164,6 +168,12 @@ module core_v_mini_mcu #(
   obi_rsp_t  [${dma_obi_msb}:0]dma_write_resp;
   obi_req_t [${dma_obi_msb}:0]dma_addr_req;
   obi_rsp_t  [${dma_obi_msb}:0]dma_addr_resp;
+
+  % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
+    obi_rsp_t serial_link_direct_write_resp;
+    obi_req_t serial_link_slave_req;
+    obi_rsp_t serial_link_slave_resp;
+  % endif
 
   // ram signals
   obi_req_t [core_v_mini_mcu_pkg::NUM_BANKS-1:0] ram_slave_req;
@@ -333,7 +343,7 @@ module core_v_mini_mcu #(
   debug_subsystem #(
       .NRHARTS    (NRHARTS),
       .JTAG_IDCODE(JTAG_IDCODE),
-      .SPI_SLAVE(${has_spi_slave}),
+      .SPI_SLAVE(${xheep.debug_ss().has_spi_slave()}),
       .obi_req_t(obi_req_t),
       .obi_rsp_t(obi_rsp_t)
   ) debug_subsystem_i (
@@ -377,6 +387,12 @@ module core_v_mini_mcu #(
       .dma_write_resp_o(dma_write_resp),
       .dma_addr_req_i(dma_addr_req),
       .dma_addr_resp_o(dma_addr_resp),
+      % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
+        .serial_link_direct_write_req_i(serial_link_direct_write_req_o),
+        .serial_link_direct_write_resp_o(serial_link_direct_write_resp),
+        .serial_link_slave_req_o(serial_link_slave_req),
+        .serial_link_slave_resp_i(serial_link_slave_resp),
+      % endif
       .ext_xbar_master_req_i(ext_xbar_master_req_i),
       .ext_xbar_master_resp_o(ext_xbar_master_resp_o),
       .ram_req_o(ram_slave_req),
@@ -433,7 +449,6 @@ module core_v_mini_mcu #(
       .ao2spc_resp_o(ext_ao_peripheral_slave_resp_o),
       .xheep_instance_id_i,
       .boot_select_i,
-      .execute_from_flash_i,
       .exit_valid_o,
       .exit_value_o,
       .spimemio_req_i(flash_mem_slave_req),
@@ -556,6 +571,12 @@ module core_v_mini_mcu #(
       .ddr_snd_1_o,
       .ddr_snd_2_o,
       .ddr_snd_3_o,
+      % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
+        .serial_link_direct_write_req_o,
+        .serial_link_direct_write_resp_i(serial_link_direct_write_resp),
+        .serial_link_slave_req_i(serial_link_slave_req),
+        .serial_link_slave_resp_o(serial_link_slave_resp),
+      % endif
       .uart_rx_i,
       .uart_tx_o,
       .camera_pclk_i(gpio_0_i),
