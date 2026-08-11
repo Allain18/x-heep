@@ -579,17 +579,17 @@ module core_v_mini_mcu #(
       % endif
       .uart_rx_i,
       .uart_tx_o,
-      .camera_pclk_i(gpio_0_i),
-      .camera_vsync_i(gpio_1_i),
-      .camera_href_i(gpio_2_i),
-      .camera_data_0_i(gpio_3_i),
-      .camera_data_1_i(gpio_4_i),
-      .camera_data_2_i(gpio_5_i),
-      .camera_data_3_i(gpio_6_i),
-      .camera_data_4_i(gpio_7_i),
-      .camera_data_5_i(gpio_8_i),
-      .camera_data_6_i(gpio_9_i),
-      .camera_data_7_i(gpio_10_i)
+      .camera_pclk_i(cam_pclk_i),
+      .camera_vsync_i(cam_vsync_i),
+      .camera_href_i(cam_href_i),
+      .camera_data_0_i(cam_data_0_i),
+      .camera_data_1_i(cam_data_1_i),
+      .camera_data_2_i(cam_data_2_i),
+      .camera_data_3_i(cam_data_3_i),
+      .camera_data_4_i(cam_data_4_i),
+      .camera_data_5_i(cam_data_5_i),
+      .camera_data_6_i(cam_data_6_i),
+      .camera_data_7_i(cam_data_7_i)
   );
 
   // Debug_req assign
