@@ -2,7 +2,9 @@ module camera_model #(
     parameter int H_ACTIVE = 640,
     parameter int V_ACTIVE = 480,
     parameter int H_BLANK  = 16,
-    parameter int V_BLANK  = 10
+    parameter int V_BLANK  = 10,
+
+    parameter int START_DELAY = 250000  // Delay 2.5ms to boot soft
 ) (
     input logic clk_i,  // Pixel clock
     input logic rst_ni,
@@ -28,11 +30,26 @@ module camera_model #(
   logic clk_div16;
   logic [2:0] div_cnt;
 
+  int unsigned start_cnt;
+  logic armed;
+
   assign pixel_idx = y * H_ACTIVE + x;
   assign active = (y < V_ACTIVE) && (x < H_ACTIVE);
 
 
   assign pclk_o = clk_div16;
+
+  // Startup loop
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (~rst_ni) begin
+      start_cnt <= 0;
+      armed     <= 1'b0;
+    end else if (start_cnt == START_DELAY) begin
+      armed <= 1'b1;
+    end else begin
+      start_cnt <= start_cnt + 1;
+    end
+  end
 
   // Clock divisor (may be remove later if dma is fast enough)
   always_ff @(posedge clk_i or negedge rst_ni) begin
@@ -50,7 +67,7 @@ module camera_model #(
   end
 
   always_ff @(posedge pclk_o or negedge rst_ni) begin
-    if (~rst_ni) begin
+    if (~rst_ni || !armed) begin
       x        <= 0;
       y        <= 0;
       byte_sel <= 0;
@@ -75,7 +92,8 @@ module camera_model #(
   end
 
   always_ff @(posedge pclk_o or negedge rst_ni) begin
-    if (~rst_ni) begin
+    if (~rst_ni || !armed) begin
+      // Idle: blanking, no data valid, so nothing is pushed into the FIFO.
       href_o  <= 0;
       vsync_o <= 1;
       data_o  <= 8'h00;
