@@ -745,10 +745,10 @@ module testharness #(
       camera_model camera_i(
           .clk_i(clk_i),
           .rst_ni(rst_ni),
-          .pclk_o(gpio[0]),
-          .vsync_o(gpio[1]),
-          .href_o(gpio[2]),
-          .data_o(gpio[10:3])
+          .pclk_o(gpio[3]),
+          .vsync_o(gpio[4]),
+          .href_o(gpio[5]),
+          .data_o(gpio[13:6])
       );
       % endif
 
