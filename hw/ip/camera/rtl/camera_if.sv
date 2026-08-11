@@ -10,7 +10,9 @@
 module camera_if #(
     // Register Interface data types
     parameter type reg_req_t = logic,
-    parameter type reg_rsp_t = logic
+    parameter type reg_rsp_t = logic,
+
+    parameter int unsigned FifoLogDepth = 10
 ) (
     input logic clk_i,
     input logic rst_ni,
@@ -29,38 +31,132 @@ module camera_if #(
   // ============== PACKAGE IMPORTS ==============
   import camera_reg_pkg::*;
 
-  // ============== REGISTER SIGNALS ==============
-  camera_reg2hw_t reg2hw;
-  camera_hw2reg_t hw2reg;
+  localparam bit UseTestPattern = 0;
 
-  reg_req_t fifo_win_h2d;
-  reg_rsp_t fifo_win_d2h;
+  // ============== REGISTER SIGNALS ==============
+  camera_reg2hw_t        reg2hw;
+  camera_hw2reg_t        hw2reg;
+
+  reg_req_t              fifo_win_h2d;
+  reg_rsp_t              fifo_win_d2h;
+  reg_rsp_t              fifo_win_d2h_raw;
 
   // ============== OTHER SIGNALS ==============
 
-  assign hw2reg.status.de = 1;
-  always @(cam_vsync_i) begin
-    hw2reg.status.d = ~cam_vsync_i;
-  end
+  // Camera (cam_pclk_i) domain
+  logic                  frame_active;
+  logic           [31:0] word_shift;
+  logic           [ 1:0] byte_cnt;
+  logic                  word_valid;
+  logic           [31:0] test_pattern;
+  logic           [31:0] fifo_wdata;
+  logic                  fifo_src_valid;
+  logic                  fifo_src_ready;
+
+  // Bus (clk_i) domain
+  logic                  vsync_clk;
+  logic           [31:0] fifo_rdata;
+  logic                  fifo_dst_valid;
+  logic                  fifo_pop;
+  logic                  win_read;
+
+  assign hw2reg.control.d  = 1'b0;
+  assign hw2reg.control.de = 1'b0;
+
+  // vsync is asynchronous to the bus clock, resynchronize before exposing it.
+  sync #(
+      .STAGES(2)
+  ) vsync_sync_i (
+      .clk_i,
+      .rst_ni,
+      .serial_i(cam_vsync_i),
+      .serial_o(vsync_clk)
+  );
+
+  // STATUS.RUNNING: a frame is being transmitted (vsync is active low here).
+  assign hw2reg.status.d = ~vsync_clk;
+  assign hw2reg.status.de = 1'b1;
 
 
-  always_ff @(posedge clk_i or negedge rst_ni) begin
+  // Enable: software armed the capture and we are inside a frame.
+  assign frame_active = reg2hw.control.q & ~cam_vsync_i;
+
+  // Pack four pixel bytes into one bus word. hsync (href) is the per-byte
+  // data-valid coming from the camera.
+  always_ff @(posedge cam_pclk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-
+      word_shift <= '0;
+      byte_cnt   <= '0;
+      word_valid <= 1'b0;
+    end else if (!frame_active) begin
+      // Resynchronize on the word boundary at every frame/line gap.
+      byte_cnt   <= '0;
+      word_valid <= 1'b0;
     end else begin
-
+      word_valid <= 1'b0;
+      if (cam_hsync_i) begin
+        word_shift <= {word_shift[23:0], cam_data_i};
+        byte_cnt   <= byte_cnt + 2'd1;
+        word_valid <= (byte_cnt == 2'd3);
+      end
     end
   end
+
+  // Placeholder payload: increments once per pushed word.
+  always_ff @(posedge cam_pclk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      test_pattern <= 32'hA9A8A7A6;
+    end else if (fifo_src_valid & fifo_src_ready) begin
+      test_pattern <= test_pattern + 32'd1;
+    end
+  end
+
+  assign fifo_wdata     = UseTestPattern ? test_pattern : word_shift;
+
+  // Write enable into the FIFO. A word arriving while the FIFO is full is
+  // dropped; software is expected to keep draining through the DATA window.
+  assign fifo_src_valid = word_valid;
+
+  // ------------------------- Clock domain crossing FIFO
+  cdc_fifo_gray #(
+      .T(logic [31:0]),
+      .LOG_DEPTH(FifoLogDepth)
+  ) camera_fifo_i (
+      .src_clk_i  (cam_pclk_i),
+      .src_rst_ni (rst_ni),
+      .src_data_i (fifo_wdata),
+      .src_valid_i(fifo_src_valid),
+      .src_ready_o(fifo_src_ready),
+
+      .dst_clk_i  (clk_i),
+      .dst_rst_ni (rst_ni),
+      .dst_data_o (fifo_rdata),
+      .dst_valid_o(fifo_dst_valid),
+      .dst_ready_i(fifo_pop)
+  );
 
   camera_window #(
       .reg_req_t(reg_req_t),
       .reg_rsp_t(reg_rsp_t)
   ) camera_window_i (
       .win_i  (fifo_win_h2d),
-      .win_o  (fifo_win_d2h),
-      .data_i (32'hA9),
-      .ready_o()
+      .win_o  (fifo_win_d2h_raw),
+      .data_i (fifo_rdata),
+      // High on a read of the DATA window
+      .ready_o(win_read)
   );
+
+  // An empty FIFO returns nothing at all rather than a made-up word: the read
+  // is held off until the camera has actually produced a word. The bus master
+  // (DMA or core) therefore runs at the pace of the pixel stream.
+  // NOTE: a read issued while the camera is stopped stalls until it restarts.
+  always_comb begin
+    fifo_win_d2h       = fifo_win_d2h_raw;
+    fifo_win_d2h.ready = fifo_win_d2h_raw.ready & (fifo_dst_valid | ~win_read);
+  end
+
+  // Pop only on the cycle the read actually completes.
+  assign fifo_pop = win_read & fifo_dst_valid;
 
   // ------------------------- Registers
   camera_reg_top #(
