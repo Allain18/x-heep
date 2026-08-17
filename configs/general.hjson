@@ -1,8 +1,8 @@
 {
-    bus_type: "NtoM"
+    bus_type: "onetoM"
     ram_banks: {
         code_and_data: {
-            num: 4
+            num: 8
             sizes: [32]
         }
     }
@@ -60,8 +60,7 @@
         w25q128jw_controller: {
             offset:  0x00029000
             length:  0x00007000
-            is_included: "yes"
-            cache: "yes"
+            is_included: "no"
         }
         dma: {
             offset:  0x00030000
@@ -164,10 +163,15 @@
             length:  0x00010000
             is_included: "no"
         }
-        serial_link_wrapper_mux: {
+        camera: {
             offset:  0x000C0000
             length:  0x00010000
-            is_included: "no"
+            is_included: "yes"
+        }
+        hdmi: {
+            offset:  0x000D0000
+            length:  0x00010000
+            is_included: "yes"
         }
     }
 
