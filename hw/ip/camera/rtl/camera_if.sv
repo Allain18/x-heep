@@ -12,7 +12,17 @@ module camera_if #(
     parameter type reg_req_t = logic,
     parameter type reg_rsp_t = logic,
 
-    parameter int unsigned FifoLogDepth = 10
+    // Depth is 2**FifoLogDepth words. cdc_fifo_gray is a flip-flop array with the
+    // whole contents exposed in parallel, so every extra bit of depth doubles
+    // both the register count and the width of the read multiplexer. At 10 that
+    // is 1024 x 32 = 32768 flip-flops plus a 1024:1 mux, which on the Pynq-Z2
+    // congests the device on its own.
+    //
+    // Depth cannot fix a rate mismatch anyway: the camera produces a word every
+    // four pixel clocks, faster than the 15 MHz bus can drain it, so 1024 entries
+    // only buy about 170 us before overflow. It only needs to be deep enough to
+    // absorb bus arbitration jitter.
+    parameter int unsigned FifoLogDepth = 5
 ) (
     input logic clk_i,
     input logic rst_ni,
