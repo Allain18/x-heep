@@ -120,7 +120,15 @@ module peripheral_subsystem #(
     input logic camera_data_4_i,
     input logic camera_data_5_i,
     input logic camera_data_6_i,
-    input logic camera_data_7_i
+    input logic camera_data_7_i,
+
+    // HDMI. Not pad signals: the pixel clock comes from the FPGA clocking
+    // resources and the TMDS words go to device-specific serialisers, both of
+    // which live outside the MCU.
+    input  logic       hdmi_pclk_i,
+    output logic [9:0] hdmi_tmds_ch0_o,
+    output logic [9:0] hdmi_tmds_ch1_o,
+    output logic [9:0] hdmi_tmds_ch2_o
 );
 
   import core_v_mini_mcu_pkg::*;
@@ -721,6 +729,28 @@ module peripheral_subsystem #(
     .cam_vsync_i(camera_vsync_i),
     .cam_data_i(camera_data_i)
   );
+% endif
+
+% if user_peripheral_domain.contains_peripheral('hdmi'):
+  hdmi_if #(
+      .reg_req_t(reg_req_t),
+      .reg_rsp_t(reg_rsp_t)
+  ) hdmi_i(
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+    .reg_req_i(peripheral_slv_req[core_v_mini_mcu_pkg::HDMI_IDX]),
+    .reg_rsp_o(peripheral_slv_rsp[core_v_mini_mcu_pkg::HDMI_IDX]),
+
+    .pclk_i(hdmi_pclk_i),
+    .tmds_ch0_o(hdmi_tmds_ch0_o),
+    .tmds_ch1_o(hdmi_tmds_ch1_o),
+    .tmds_ch2_o(hdmi_tmds_ch2_o)
+  );
+% else:
+    // Hold the link in a control period so an unused HDMI output stays quiet.
+    assign hdmi_tmds_ch0_o = 10'b1101010100;
+    assign hdmi_tmds_ch1_o = 10'b1101010100;
+    assign hdmi_tmds_ch2_o = 10'b1101010100;
 % endif
 
 % if len(user_peripheral_domain.get_peripherals()) == 0:

@@ -101,6 +101,14 @@ module x_heep_system #(
     // External SPC interface
     output logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] dma_done_o,
 
+    // HDMI. Deliberately outside the pad ring: the pixel clock comes from the
+    // board clocking resources and the TMDS words go to device-specific
+    // serialisers driving the differential pins.
+    input  logic       hdmi_pclk_i,
+    output logic [9:0] hdmi_tmds_ch0_o,
+    output logic [9:0] hdmi_tmds_ch1_o,
+    output logic [9:0] hdmi_tmds_ch2_o,
+
     % for pad in xheep.get_padring().pad_list:
       <%
       has_input_pin = any(isinstance(pin, Input) for pin in pad.pins)
@@ -183,6 +191,12 @@ module x_heep_system #(
     % if user_peripheral_domain.contains_peripheral('serial_link_reg'):
       .serial_link_direct_write_req_o,   
       .serial_link_direct_write_resp_i,  
+    % endif
+    % if user_peripheral_domain.contains_peripheral('hdmi'):
+    .hdmi_pclk_i,
+    .hdmi_tmds_ch0_o,
+    .hdmi_tmds_ch1_o,
+    .hdmi_tmds_ch2_o,
     % endif
     .hart_id_i,
     .xheep_instance_id_i,
