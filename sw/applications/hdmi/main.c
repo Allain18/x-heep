@@ -75,7 +75,7 @@ int main(void) {
   // 800*525 cycles. Wait for a couple of them rather than for real time.
   uint32_t measure_cycles = 2 * 800 * 525;
 #else
-  uint32_t measure_cycles = freq_hz / 2;  // half a second
+  uint32_t measure_cycles = freq_hz *10;  //  10 second
 #endif
 
   PRINTF("Number of cycles to measure: %u\n", measure_cycles);
