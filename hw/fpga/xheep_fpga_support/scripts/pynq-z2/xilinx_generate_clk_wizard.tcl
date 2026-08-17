@@ -11,9 +11,13 @@ set out_clk_freq_MHz 15
 # 59.5 Hz, which monitors accept, and divides exactly from the same VCO as the
 # system clock. The serialiser clock must be exactly 5x the pixel clock.
 #
-# One VCO serves all three: 125 MHz x 6 = 750 MHz, then /50 = 15, /30 = 25,
-# /6 = 125. Sharing the MMCM matters, because OSERDESE2 requires CLK and CLKDIV
-# to be phase aligned.
+# Only the requested frequencies are set here. The wizard picks the VCO and the
+# dividers itself, and rejects any attempt to force MMCM_* on top of that with
+# "attempt to modify the value of disabled parameter ... has been ignored".
+# It settles on 125 MHz x 9 = 1125 MHz, then /75 = 15, /45 = 25, /9 = 125.
+#
+# What matters is that all three come off one MMCM: OSERDESE2 requires CLK and
+# CLKDIV to be phase aligned.
 set pix_clk_freq_MHz    25
 set pix_clk_5x_freq_MHz 125
 
@@ -41,10 +45,6 @@ set_property -dict [ list \
  CONFIG.CLKOUT3_USED {true} \
  CONFIG.CLKOUT3_REQUESTED_OUT_FREQ $pix_clk_5x_freq_MHz \
  CONFIG.MMCM_CLKIN1_PERIOD {8.000} \
- CONFIG.MMCM_CLKFBOUT_MULT_F {6.000} \
- CONFIG.MMCM_CLKOUT0_DIVIDE_F {50.000} \
- CONFIG.MMCM_CLKOUT1_DIVIDE {30} \
- CONFIG.MMCM_CLKOUT2_DIVIDE {6} \
  CONFIG.PRIM_IN_FREQ $in_clk_freq_MHz \
  CONFIG.USE_LOCKED {false} \
  CONFIG.USE_RESET {false} \
