@@ -116,24 +116,23 @@ set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets ddr_snd_clk_o_OBUF]
 # HDMI OUT connector (J10). Pin locations come from the TUL board file,
 # board_files/esl_epfl_pynq_z2_board_files/part0_pins.xml.
 #
-# The board file declares these as LVCMOS33, not TMDS_33, so each lane is driven
-# as two independent single-ended pins with the n side carrying the inverse. That
-# is why there is no OBUFDS anywhere in the HDMI path. These constraints must
-# stay in step with the HDMI_OUT define on the pynq-z2 target: the wrapper only
-# has these ports when that define is set.
-set_property -dict {PACKAGE_PIN L16 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_clk_p_o}]
-set_property -dict {PACKAGE_PIN L17 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_clk_n_o}]
-set_property -dict {PACKAGE_PIN K17 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_data_p_o[0]}]
-set_property -dict {PACKAGE_PIN K18 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_data_n_o[0]}]
-set_property -dict {PACKAGE_PIN K19 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_data_p_o[1]}]
-set_property -dict {PACKAGE_PIN J19 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_data_n_o[1]}]
-set_property -dict {PACKAGE_PIN J18 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_data_p_o[2]}]
-set_property -dict {PACKAGE_PIN H18 IOSTANDARD LVCMOS33} [get_ports {hdmi_tx_data_n_o[2]}]
-
-# 250 Mbit/s on a 3.3V single-ended pin needs the fastest slew the bank offers,
-# and the lowest drive that still swings cleanly keeps the ground bounce down.
-set_property SLEW FAST [get_ports {hdmi_tx_clk_p_o hdmi_tx_clk_n_o}]
-set_property SLEW FAST [get_ports {hdmi_tx_data_p_o[*] hdmi_tx_data_n_o[*]}]
-set_property DRIVE 8 [get_ports {hdmi_tx_clk_p_o hdmi_tx_clk_n_o}]
-set_property DRIVE 8 [get_ports {hdmi_tx_data_p_o[*] hdmi_tx_data_n_o[*]}]
+# The board file lists these as LVCMOS33, but they are driven as true TMDS_33
+# pairs out of OBUFDS, which is also what the official PYNQ base design does.
+# Single-ended is not an option here: a 10:1 OSERDESE2 cascade occupies the OLOGIC
+# of both pins of a pair, so only the master pin can emit and the complement has
+# to come from the output buffer.
+#
+# Bank 34 is an HR bank at VCCO 3.3V, which is what TMDS_33 requires. No SLEW or
+# DRIVE properties: those do not apply to a differential output standard.
+#
+# These constraints must stay in step with the HDMI_OUT define on the pynq-z2
+# target, since the wrapper only has these ports when that define is set.
+set_property -dict {PACKAGE_PIN L16 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_clk_p_o}]
+set_property -dict {PACKAGE_PIN L17 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_clk_n_o}]
+set_property -dict {PACKAGE_PIN K17 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_data_p_o[0]}]
+set_property -dict {PACKAGE_PIN K18 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_data_n_o[0]}]
+set_property -dict {PACKAGE_PIN K19 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_data_p_o[1]}]
+set_property -dict {PACKAGE_PIN J19 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_data_n_o[1]}]
+set_property -dict {PACKAGE_PIN J18 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_data_p_o[2]}]
+set_property -dict {PACKAGE_PIN H18 IOSTANDARD TMDS_33} [get_ports {hdmi_tx_data_n_o[2]}]
 %endif

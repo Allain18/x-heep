@@ -36,9 +36,9 @@ module xilinx_core_v_mini_mcu_wrapper
 `endif
 
 `ifdef HDMI_OUT
-    // "HDMI OUT" connector. Each lane is driven as two independent LVCMOS33
-    // pins rather than a true differential pair; see hdmi_tmds_out_xilinx for
-    // why. Keep this define in step with the hdmi entry in the peripheral
+    // "HDMI OUT" connector. Each lane is a TMDS_33 differential pair driven by
+    // an OBUFDS inside hdmi_tmds_out_xilinx. Keep this define in step with the
+    // hdmi entry in the peripheral
     // configuration: the pin constraints are emitted only when that entry is
     // included.
     output wire       hdmi_tx_clk_p_o,

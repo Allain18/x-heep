@@ -3,11 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 
 // 7-series output stage for the HDMI transmitter: four 10:1 serialisers turning
-// the TMDS words into serial lanes, plus a fixed word on the clock lane.
+// the TMDS words into serial lanes, plus a fixed word on the clock lane. Each
+// lane leaves through an OBUFDS driving a TMDS_33 differential pair.
 //
 // At 640x480@60 the pixel clock is 25 MHz, so each lane runs at 250 Mbit/s. That
 // is far below what an HR bank can do, and the OSERDESE2 primitives need CLK at
 // five times CLKDIV with both coming from the same MMCM.
+//
+// One serialiser per pair, not two: a 10:1 DDR conversion needs a cascaded
+// master/slave OSERDESE2, and the SHIFTOUT/SHIFTIN chain only runs between the
+// two OLOGIC blocks of one differential pair (UG471). A 10:1 lane therefore
+// occupies the OLOGIC of both pins and can only emit on the master's pin, which
+// is exactly why the complementary side has to come from OBUFDS rather than from
+// a second serialiser.
 //
 // This module is Xilinx-specific on purpose. It sits in the FPGA wrapper so the
 // RTL inside the MCU stays portable and simulable.
@@ -21,7 +29,6 @@ module hdmi_tmds_out_xilinx (
     input logic [9:0] tmds_ch1_i,  // green
     input logic [9:0] tmds_ch2_i,  // red
 
-    // Driven as two independent single-ended pins per lane, see the note below.
     output logic       hdmi_clk_p_o,
     output logic       hdmi_clk_n_o,
     output logic [2:0] hdmi_data_p_o,
@@ -40,35 +47,31 @@ module hdmi_tmds_out_xilinx (
   assign lane_word[2] = tmds_ch2_i;
   assign lane_word[3] = ClkWord;
 
-  logic [3:0] ser_p, ser_n;
+  logic [3:0] serial;
+  logic [3:0] pad_p, pad_n;
 
   for (genvar i = 0; i < 4; i++) begin : gen_lane
-    hdmi_oserdes10 ser_p_i (
+    hdmi_oserdes10 ser_i (
         .pclk_i,
         .pclk5x_i,
         .rst_i,
         .data_i  (lane_word[i]),
-        .serial_o(ser_p[i])
+        .serial_o(serial[i])
     );
 
-    // The pins are constrained as LVCMOS33 rather than TMDS_33, which rules out
-    // OBUFDS, and OSERDESE2 has no complementary output. So the inverse is
-    // produced by a second serialiser fed with inverted data. Both sit in the
-    // same bank on the same two clocks, which keeps the skew between them in the
-    // hundreds of picoseconds against a 4 ns unit interval.
-    hdmi_oserdes10 ser_n_i (
-        .pclk_i,
-        .pclk5x_i,
-        .rst_i,
-        .data_i  (~lane_word[i]),
-        .serial_o(ser_n[i])
+    // The IOB generates the complement, so the two halves of the pair are
+    // matched by construction instead of by placement.
+    OBUFDS obufds_i (
+        .I (serial[i]),
+        .O (pad_p[i]),
+        .OB(pad_n[i])
     );
   end
 
-  assign hdmi_data_p_o = ser_p[2:0];
-  assign hdmi_data_n_o = ser_n[2:0];
-  assign hdmi_clk_p_o  = ser_p[3];
-  assign hdmi_clk_n_o  = ser_n[3];
+  assign hdmi_data_p_o = pad_p[2:0];
+  assign hdmi_data_n_o = pad_n[2:0];
+  assign hdmi_clk_p_o  = pad_p[3];
+  assign hdmi_clk_n_o  = pad_n[3];
 
 endmodule  // hdmi_tmds_out_xilinx
 
