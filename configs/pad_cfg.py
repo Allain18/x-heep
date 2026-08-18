@@ -86,6 +86,7 @@ def config(xheep: XHeep) -> PadRing:
         Output("ddr_snd_2"),
         Output("ddr_snd_3"),
         # Camera
+        Output("cam_xclk"),
         Input("cam_pclk"),
         Input("cam_vsync"),
         Input("cam_href"),
@@ -131,7 +132,7 @@ def config(xheep: XHeep) -> PadRing:
             ["ddr_snd_clk"],
             ["gpio_0"],
             ["gpio_1", "ddr_rcv_0"],
-            ["gpio_2", "ddr_rcv_1"],
+            ["gpio_2", "ddr_rcv_1", "cam_xclk"],
             ["gpio_3", "ddr_rcv_2", "cam_pclk"],
             ["gpio_4", "cam_vsync"],
             ["gpio_5", "cam_href"],

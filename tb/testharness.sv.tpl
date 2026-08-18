@@ -747,7 +747,7 @@ module testharness #(
       % if user_peripheral_domain.contains_peripheral('camera'):
       // Camera example
       camera_model camera_i(
-          .clk_i(clk_i),
+          .clk_i(gpio[2]),
           .rst_ni(rst_ni),
           .pclk_o(gpio[3]),
           .vsync_o(gpio[4]),

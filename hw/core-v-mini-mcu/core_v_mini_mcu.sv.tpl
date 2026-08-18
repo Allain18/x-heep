@@ -649,5 +649,7 @@ module core_v_mini_mcu #(
     % endif
   % endfor
 
+  assign cam_xclk_o = clk_i;
+
 
 endmodule  // core_v_mini_mcu

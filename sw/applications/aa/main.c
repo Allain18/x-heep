@@ -30,7 +30,7 @@
 // P15 (arduino_direct_iic_scl_io) -> SCL
 // P16 (arduino_direct_iic_sda_io) -> SDA
 
-uint16_t rgb565[10000];
+uint16_t rgb565[2000];
 // volatile uint16_t rgb565[1000];
 
 /* ============================================================
@@ -41,6 +41,8 @@ int main(void) {
   pad_control_t pad_control;
   pad_control.base_addr =
       mmio_region_from_addr((uintptr_t)PAD_CONTROL_START_ADDRESS);
+  pad_control_set_mux(&pad_control,
+                      (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_2_REG_OFFSET), 2);
   pad_control_set_mux(&pad_control,
                       (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_3_REG_OFFSET), 2);
   pad_control_set_mux(&pad_control,

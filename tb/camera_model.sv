@@ -4,7 +4,7 @@ module camera_model #(
     parameter int H_BLANK  = 16,
     parameter int V_BLANK  = 10,
 
-    parameter int START_DELAY = 250000  // Delay 2.5ms to boot soft
+    parameter int START_DELAY = 30000  // Delay 300us to boot soft
 ) (
     input logic clk_i,  // Pixel clock
     input logic rst_ni,
@@ -50,6 +50,7 @@ module camera_model #(
       start_cnt <= start_cnt + 1;
     end
   end
+  // assign armed = 1;
 
   // Clock divisor (may be remove later if dma is fast enough)
   always_ff @(posedge clk_i or negedge rst_ni) begin
