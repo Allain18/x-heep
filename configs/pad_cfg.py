@@ -85,6 +85,7 @@ def config(xheep: XHeep) -> PadRing:
         Output("ddr_snd_1"),
         Output("ddr_snd_2"),
         Output("ddr_snd_3"),
+        # Camera
         Input("cam_pclk"),
         Input("cam_vsync"),
         Input("cam_href"),
