@@ -14,6 +14,9 @@
 #error ( "This app does NOT work as the I2C peripheral is not included" )
 #endif
 
+#ifndef CAMERA_IS_INCLUDED
+#error ( "This app does NOT work as the CAMERA peripheral is not included" )
+#endif
 /* By default, PRINTFs are activated for FPGA and disabled for simulation. */
 #define PRINTF_IN_FPGA 1
 #define PRINTF_IN_SIM 1
