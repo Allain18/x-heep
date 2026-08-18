@@ -192,12 +192,10 @@ module x_heep_system #(
       .serial_link_direct_write_req_o,   
       .serial_link_direct_write_resp_i,  
     % endif
-    % if user_peripheral_domain.contains_peripheral('hdmi'):
     .hdmi_pclk_i,
     .hdmi_tmds_ch0_o,
     .hdmi_tmds_ch1_o,
     .hdmi_tmds_ch2_o,
-    % endif
     .hart_id_i,
     .xheep_instance_id_i,
     .intr_vector_ext_i,
