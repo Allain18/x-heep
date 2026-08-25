@@ -36,6 +36,7 @@ PYTHON  	:= $(shell which python)
 RV_PROFILE  := $(shell which rv_profile)
 AREA_PLOT   := $(shell which area-plot)
 endif
+CONDA_ENV_NAME ?= $(shell sed -n 's/^name: //p' util/conda_environment.yml)
 
 # FuseSoC cores root. Defaults to the root of the parent project vendoring X-HEEP.
 FUSESOC_CORES_ROOT	?= $(HEEP_EXTERNAL_ROOT)
@@ -65,7 +66,6 @@ TARGET ?= sim
 # Mcu-gen configuration files
 X_HEEP_CFG  ?= configs/general.hjson
 PADS_CFG ?= configs/pad_cfg.py
-PYTHON_X_HEEP_CFG ?=
 
 # MCU-Gen template files to generate
 MCU_GEN_TEMPLATES = $(shell find . \
@@ -141,8 +141,14 @@ VENDOR_LOCKS	:= $(subst .vendor.hjson,.lock.hjson,$(VENDOR_FILES))
 export
 
 ## @section Conda
-conda:
-	conda env create -f util/conda_environment.yml
+conda: util/conda_environment.yml
+	@if conda info --envs | grep -q $(CONDA_ENV_NAME); then \
+		echo "Environment $(CONDA_ENV_NAME) exists, updating..."; \
+		conda env update -f util/conda_environment.yml --prune; \
+	else \
+		echo "Creating new $(CONDA_ENV_NAME) environment..."; \
+		conda env create -f util/conda_environment.yml; \
+	fi
 
 ## @section Installation
 
@@ -152,9 +158,8 @@ conda:
 ## @param MEMORY_BANKS=[2(default)to(16-MEMORY_BANKS_IL)]
 ## @param MEMORY_BANKS_IL=[0(default),2,4,8]
 ## @param X_HEEP_CFG=[configs/general.hjson(default),<path-to-config-file>]
-## @param PYTHON_X_HEEP_CFG=[configs/general.py(default),<path-to-config-file>]
 mcu-gen:
-	$(PYTHON) util/xheep_gen/mcu_gen.py --config $(X_HEEP_CFG) --python_config $(PYTHON_X_HEEP_CFG) --pads_cfg $(PADS_CFG) --outtpl "$(MCU_GEN_TEMPLATES)" --externaltpl "$(EXTERNAL_MCU_GEN_TEMPLATES)" --cpu $(CPU) --bus $(BUS) --memorybanks $(MEMORY_BANKS) --memorybanks_il $(MEMORY_BANKS_IL)
+	$(PYTHON) util/xheep_gen/mcu_gen.py --config $(X_HEEP_CFG) --pads_cfg $(PADS_CFG) --outtpl "$(MCU_GEN_TEMPLATES)" --externaltpl "$(EXTERNAL_MCU_GEN_TEMPLATES)" --cpu $(CPU) --bus $(BUS) --memorybanks $(MEMORY_BANKS) --memorybanks_il $(MEMORY_BANKS_IL)
 
 	@echo "### MCU-GEN completed! Running FuseSoC register generators..."	
 	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --target=sim --tool=verilator $(FUSESOC_FLAGS) --setup openhwgroup.org:systems:core-v-mini-mcu
@@ -435,7 +440,7 @@ clean: clean-app
 
 ## Leave the repository in a clean state, removing all generated files. For now, it just calls clean.
 .PHONY: clean-all
-clean-all: clean
+clean-all: clean vendor-clean
 
 ## @section Utilities
 # Check if a program is available in PATH
