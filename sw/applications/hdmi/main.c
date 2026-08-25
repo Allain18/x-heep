@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 
 // HDMI output smoke test.
-//
-// Checks that the pixel clock is actually running by watching the frame
-// counter, then walks through the built-in test patterns so there is something
-// to look at on the monitor.
 
 #include <stdint.h>
 #include <stdio.h>
@@ -38,15 +34,34 @@
 #define HDMI_PATTERN_CHECKER 2
 #define HDMI_PATTERN_SOLID 3
 
-static void hdmi_set_pattern(uint32_t pattern) {
+// How long each pattern stays on screen,
+#define PATTERN_SECONDS 5
+#define MEASURE_SECONDS 2
+
+typedef struct {
+  const char* name;
+  uint32_t pattern;
+  uint32_t color;  // only used by HDMI_PATTERN_SOLID
+} hdmi_step_t;
+
+static const hdmi_step_t steps[] = {
+    {"colour bars", HDMI_PATTERN_BARS, 0},
+    {"xor texture", HDMI_PATTERN_XOR, 0},
+    {"checkerboard with border", HDMI_PATTERN_CHECKER, 0},
+    {"solid red", HDMI_PATTERN_SOLID, 0xFF0000},
+    {"solid green", HDMI_PATTERN_SOLID, 0x00FF00},
+    {"solid blue", HDMI_PATTERN_SOLID, 0x0000FF},
+};
+
+#define NUM_STEPS (sizeof(steps) / sizeof(steps[0]))
+
+static void hdmi_show(const hdmi_step_t* step) {
+  // COLOR first, so the pixel side never latches a new pattern against a stale
+  // colour. Both only take effect at the next vertical sync anyway.
+  hdmi_peri->COLOR = step->color & HDMI_COLOR_RGB_MASK;
   hdmi_peri->CTRL =
       (1 << HDMI_CTRL_EN_BIT) |
-      ((pattern & HDMI_CTRL_PATTERN_MASK) << HDMI_CTRL_PATTERN_OFFSET);
-}
-
-static void hdmi_set_solid(uint32_t rgb) {
-  hdmi_peri->COLOR = rgb & HDMI_COLOR_RGB_MASK;
-  hdmi_set_pattern(HDMI_PATTERN_SOLID);
+      ((step->pattern & HDMI_CTRL_PATTERN_MASK) << HDMI_CTRL_PATTERN_OFFSET);
 }
 
 // Busy-waits on the cycle counter rather than using timer_wait_us, which parks
@@ -67,22 +82,23 @@ int main(void) {
   PRINTF("=== HDMI Test ===\n");
   PRINTF("system clock: %u Hz\n", freq_hz);
 
+  // Get a picture up before doing anything else.
+  hdmi_show(&steps[0]);
+
   // The frame counter lives in the bus clock domain but only advances on
   // vertical sync coming from the pixel domain. If it never moves, the pixel
   // clock is dead and nothing else is worth debugging.
 #if TARGET_SIM
-  // In simulation the pixel clock is tied to the bus clock, so a whole frame is
+  // In simulation the pixel clock is tied to the bus clock, so one frame takes
   // 800*525 cycles. Wait for a couple of them rather than for real time.
   uint32_t measure_cycles = 2 * 800 * 525;
 #else
-  uint32_t measure_cycles = freq_hz *10;  //  10 second
+  uint32_t measure_cycles = freq_hz * MEASURE_SECONDS;
 #endif
 
-  PRINTF("Number of cycles to measure: %u\n", measure_cycles);
   uint32_t frames_before = hdmi_peri->FRAME_CNT;
   wait_cycles(measure_cycles);
-  uint32_t frames_after = hdmi_peri->FRAME_CNT;
-  uint32_t frames = frames_after - frames_before;
+  uint32_t frames = hdmi_peri->FRAME_CNT - frames_before;
 
   PRINTF("frames in %u cycles: %u\n", measure_cycles, frames);
 
@@ -92,32 +108,29 @@ int main(void) {
   }
 
 #if !TARGET_SIM
-  // measure_cycles is half a second, so twice the count is the refresh rate.
-  PRINTF("refresh: ~%u Hz (expect ~59)\n", frames * 2);
+  PRINTF("refresh: ~%u Hz (expect ~59)\n", frames / MEASURE_SECONDS);
 #endif
 
-  PRINTF("colour bars\n");
-  hdmi_set_pattern(HDMI_PATTERN_BARS);
-  wait_cycles(measure_cycles);
+  uint32_t pattern_cycles = freq_hz * PATTERN_SECONDS;
 
-  PRINTF("xor texture\n");
-  hdmi_set_pattern(HDMI_PATTERN_XOR);
-  wait_cycles(measure_cycles);
+  // On the board, cycle forever. Returning from main lets the runtime stop the
+  // core, and any reset after that clears CTRL and blanks the screen, which
+  // looks exactly like the display flickering to black.
+  for (;;) {
+    for (unsigned i = 0; i < NUM_STEPS; i++) {  // NUM_STEPS
+      PRINTF("%s\n", steps[i].name);
+      hdmi_show(&steps[i]);
+#if TARGET_SIM
+      wait_cycles(measure_cycles);
+#else
+      wait_cycles(pattern_cycles);
+#endif
+    }
 
-  PRINTF("checkerboard with border\n");
-  hdmi_set_pattern(HDMI_PATTERN_CHECKER);
-  wait_cycles(measure_cycles);
-
-  PRINTF("solid red, green, blue\n");
-  hdmi_set_solid(0xFF0000);
-  wait_cycles(measure_cycles);
-  hdmi_set_solid(0x00FF00);
-  wait_cycles(measure_cycles);
-  hdmi_set_solid(0x0000FF);
-  wait_cycles(measure_cycles);
-
-  // Leave something recognisable on screen.
-  hdmi_set_pattern(HDMI_PATTERN_BARS);
+#if TARGET_SIM
+    break;
+#endif
+  }
 
   PRINTF("=== Test finished ===\n");
   return 0;
