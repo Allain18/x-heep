@@ -54,7 +54,6 @@ module camera_if #(
   logic                  fifo_src_ready;
 
   // Bus (clk_i) domain
-  logic                  vsync_clk;
   logic           [31:0] fifo_rdata;
   logic                  fifo_dst_valid;
   logic                  fifo_pop;
@@ -63,18 +62,9 @@ module camera_if #(
   assign hw2reg.control.d  = 1'b0;
   assign hw2reg.control.de = 1'b0;
 
-  // vsync is asynchronous to the bus clock, resynchronize before exposing it.
-  sync #(
-      .STAGES(2)
-  ) vsync_sync_i (
-      .clk_i,
-      .rst_ni,
-      .serial_i(cam_vsync_i),
-      .serial_o(vsync_clk)
-  );
 
   // STATUS.RUNNING: a frame is being transmitted (vsync is active low here).
-  assign hw2reg.status.d  = ~vsync_clk;
+  assign hw2reg.status.d  = ~cam_vsync_i;
   assign hw2reg.status.de = 1'b1;
 
 
