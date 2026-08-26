@@ -31,7 +31,8 @@ module camera_if #(
   // ============== PACKAGE IMPORTS ==============
   import camera_reg_pkg::*;
 
-  localparam bit UseTestPattern = 0;
+  localparam bit UseTestPattern = 1;
+  logic                  cam_pclk;
 
   // ============== REGISTER SIGNALS ==============
   camera_reg2hw_t        reg2hw;
@@ -59,13 +60,15 @@ module camera_if #(
   logic                  fifo_pop;
   logic                  win_read;
 
-  assign hw2reg.control.d  = 1'b0;
+  assign hw2reg.control.d = 1'b0;
   assign hw2reg.control.de = 1'b0;
 
 
   // STATUS.RUNNING: a frame is being transmitted (vsync is active low here).
-  assign hw2reg.status.d  = ~cam_vsync_i;
+  assign hw2reg.status.d = ~cam_vsync_i;
   assign hw2reg.status.de = 1'b1;
+
+  assign cam_pclk = UseTestPattern ? clk_i : cam_pclk_i;
 
 
   // Enable: software armed the capture and we are inside a frame.
@@ -75,7 +78,7 @@ module camera_if #(
 
   // Pack four pixel bytes into one bus word. hsync (href) is the per-byte
   // data-valid coming from the camera.
-  always_ff @(posedge cam_pclk_i or negedge rst_ni) begin
+  always_ff @(posedge cam_pclk or negedge rst_ni) begin
     if (!rst_ni) begin
       word_shift <= '0;
       byte_cnt   <= '0;
@@ -95,7 +98,7 @@ module camera_if #(
   end
 
   // Placeholder payload: increments once per pushed word.
-  always_ff @(posedge cam_pclk_i or negedge rst_ni) begin
+  always_ff @(posedge cam_pclk or negedge rst_ni) begin
     if (!rst_ni) begin
       test_pattern <= 32'hA9A8A7A6;
     end else if (fifo_src_valid & fifo_src_ready) begin
@@ -114,7 +117,7 @@ module camera_if #(
       .T(logic [31:0]),
       .LOG_DEPTH(FifoLogDepth)
   ) camera_fifo_i (
-      .src_clk_i  (cam_pclk_i),
+      .src_clk_i  (cam_pclk),
       .src_rst_ni (rst_ni),
       .src_data_i (fifo_wdata),
       .src_valid_i(fifo_src_valid),
