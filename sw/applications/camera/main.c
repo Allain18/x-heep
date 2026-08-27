@@ -33,6 +33,10 @@
 // P15 (arduino_direct_iic_scl_io) -> SCL
 // P16 (arduino_direct_iic_sda_io) -> SDA
 
+// i2c random address for testing
+#define LSM6DSO_I2C_ADDR 0x6B
+#define LSM6DSO_WHO_AM_I 0x0F
+
 uint16_t rgb565[2000];
 // volatile uint16_t rgb565[1000];
 
@@ -76,6 +80,10 @@ int main(void) {
     PRINTF("[ERROR] I2C initialization failed\n");
     return -1;
   }
+
+  uint8_t who_am_i;
+  if (i2c_read(LSM6DSO_I2C_ADDR, LSM6DSO_WHO_AM_I, &who_am_i, 1) != kDifI2cOk)
+    PRINTF("[LSM6DSO] Error reading WHO_AM_I\n");
 
   for (int i = 0; i < 1000; i++) rgb565[i] = 0x1234;
   // memset(rgb565, 0x55, sizeof(rgb565));
