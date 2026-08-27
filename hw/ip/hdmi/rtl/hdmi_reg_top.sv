@@ -10,15 +10,20 @@
 module hdmi_reg_top #(
     parameter type reg_req_t = logic,
     parameter type reg_rsp_t = logic,
-    parameter int AW = 4
+    parameter int AW = 5
 ) (
     input logic clk_i,
     input logic rst_ni,
     input reg_req_t reg_req_i,
     output reg_rsp_t reg_rsp_o,
+
+    // Output port for window
+    output reg_req_t [1-1:0] reg_req_win_o,
+    input  reg_rsp_t [1-1:0] reg_rsp_win_i,
+
     // To HW
     output hdmi_reg_pkg::hdmi_reg2hw_t reg2hw,  // Write
-    input hdmi_reg_pkg::hdmi_hw2reg_t hw2reg,  // Read
+    input  hdmi_reg_pkg::hdmi_hw2reg_t hw2reg,  // Read
 
 
     // Config
@@ -48,8 +53,43 @@ module hdmi_reg_top #(
   reg_rsp_t reg_intf_rsp;
 
 
-  assign reg_intf_req = reg_req_i;
-  assign reg_rsp_o = reg_intf_rsp;
+  logic [0:0] reg_steer;
+
+  reg_req_t [2-1:0] reg_intf_demux_req;
+  reg_rsp_t [2-1:0] reg_intf_demux_rsp;
+
+  // demux connection
+  assign reg_intf_req = reg_intf_demux_req[1];
+  assign reg_intf_demux_rsp[1] = reg_intf_rsp;
+
+  assign reg_req_win_o[0] = reg_intf_demux_req[0];
+  assign reg_intf_demux_rsp[0] = reg_rsp_win_i[0];
+
+  // Create Socket_1n
+  reg_demux #(
+      .NoPorts(2),
+      .req_t  (reg_req_t),
+      .rsp_t  (reg_rsp_t)
+  ) i_reg_demux (
+      .clk_i,
+      .rst_ni,
+      .in_req_i(reg_req_i),
+      .in_rsp_o(reg_rsp_o),
+      .out_req_o(reg_intf_demux_req),
+      .out_rsp_i(reg_intf_demux_rsp),
+      .in_select_i(reg_steer)
+  );
+
+
+  // Create steering logic
+  always_comb begin
+    reg_steer = 1;  // Default set to register
+
+    // TODO: Can below codes be unique case () inside ?
+    if (reg_req_i.addr[AW-1:0] >= 16 && reg_req_i.addr[AW-1:0] < 20) begin
+      reg_steer = 0;
+    end
+  end
 
 
   assign reg_we = reg_intf_req.valid & reg_intf_req.write;
@@ -71,8 +111,8 @@ module hdmi_reg_top #(
   logic ctrl_en_qs;
   logic ctrl_en_wd;
   logic ctrl_en_we;
-  logic [1:0] ctrl_pattern_qs;
-  logic [1:0] ctrl_pattern_wd;
+  logic [2:0] ctrl_pattern_qs;
+  logic [2:0] ctrl_pattern_wd;
   logic ctrl_pattern_we;
   logic [23:0] color_qs;
   logic [23:0] color_wd;
@@ -109,11 +149,11 @@ module hdmi_reg_top #(
   );
 
 
-  //   F[pattern]: 2:1
+  //   F[pattern]: 3:1
   prim_subreg #(
-      .DW      (2),
+      .DW      (3),
       .SWACCESS("RW"),
-      .RESVAL  (2'h0)
+      .RESVAL  (3'h0)
   ) u_ctrl_pattern (
       .clk_i (clk_i),
       .rst_ni(rst_ni),
@@ -240,7 +280,7 @@ module hdmi_reg_top #(
   assign ctrl_en_wd = reg_wdata[0];
 
   assign ctrl_pattern_we = addr_hit[0] & reg_we & !reg_error;
-  assign ctrl_pattern_wd = reg_wdata[2:1];
+  assign ctrl_pattern_wd = reg_wdata[3:1];
 
   assign color_we = addr_hit[1] & reg_we & !reg_error;
   assign color_wd = reg_wdata[23:0];
@@ -251,7 +291,7 @@ module hdmi_reg_top #(
     unique case (1'b1)
       addr_hit[0]: begin
         reg_rdata_next[0]   = ctrl_en_qs;
-        reg_rdata_next[2:1] = ctrl_pattern_qs;
+        reg_rdata_next[3:1] = ctrl_pattern_qs;
       end
 
       addr_hit[1]: begin
@@ -287,12 +327,13 @@ module hdmi_reg_top #(
 endmodule
 
 module hdmi_reg_top_intf #(
-    parameter  int AW = 4,
+    parameter  int AW = 5,
     localparam int DW = 32
 ) (
     input logic clk_i,
     input logic rst_ni,
     REG_BUS.in regbus_slave,
+    REG_BUS.out regbus_win_mst[1-1:0],
     // To HW
     output hdmi_reg_pkg::hdmi_reg2hw_t reg2hw,  // Write
     input hdmi_reg_pkg::hdmi_hw2reg_t hw2reg,  // Read
@@ -317,6 +358,13 @@ module hdmi_reg_top_intf #(
   `REG_BUS_ASSIGN_TO_REQ(s_reg_req, regbus_slave)
   `REG_BUS_ASSIGN_FROM_RSP(regbus_slave, s_reg_rsp)
 
+  reg_bus_req_t s_reg_win_req[1-1:0];
+  reg_bus_rsp_t s_reg_win_rsp[1-1:0];
+  for (genvar i = 0; i < 1; i++) begin : gen_assign_window_structs
+    `REG_BUS_ASSIGN_TO_REQ(s_reg_win_req[i], regbus_win_mst[i])
+    `REG_BUS_ASSIGN_FROM_RSP(regbus_win_mst[i], s_reg_win_rsp[i])
+  end
+
 
 
   hdmi_reg_top #(
@@ -328,6 +376,8 @@ module hdmi_reg_top_intf #(
       .rst_ni,
       .reg_req_i(s_reg_req),
       .reg_rsp_o(s_reg_rsp),
+      .reg_req_win_o(s_reg_win_req),
+      .reg_rsp_win_i(s_reg_win_rsp),
       .reg2hw,  // Write
       .hw2reg,  // Read
       .devmode_i

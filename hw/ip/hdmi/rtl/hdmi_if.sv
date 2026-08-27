@@ -14,9 +14,12 @@
 // four serial pairs needs device-specific primitives (OSERDESE2 on 7-series), so
 // that part lives in the FPGA wrapper and stays out of this portable RTL.
 //
-// Note on what is *not* here yet: the pixel source is a test pattern generator.
-// A framebuffer fed by the DMA plugs into the same place, replacing hdmi_pattern
-// as the source of {red, green, blue}.
+// Pixel source: hdmi_pattern (patterns 0-3) or hdmi_pixel_stream (pattern 4).
+// hdmi_pixel_stream has no frame buffer either, just a shallow CDC FIFO fed
+// through the PIXEL register window; software (via DMA) is expected to
+// re-push the whole image every frame. The eventual camera path is meant to
+// write through the same window, either directly or via DMA, in place of
+// today's CPU/DMA-filled test array.
 
 module hdmi_if #(
     // Register interface data types
@@ -52,7 +55,7 @@ module hdmi_if #(
 
   import hdmi_reg_pkg::*;
 
-  localparam int unsigned CfgWidth = 27;  // {color[23:0], pattern[1:0], en}
+  localparam int unsigned CfgWidth = 28;  // {color[23:0], pattern[2:0], en}
 
   hdmi_reg2hw_t       reg2hw;
   hdmi_hw2reg_t       hw2reg;
@@ -103,12 +106,12 @@ module hdmi_if #(
   end
 
   logic        cfg_en;
-  logic [ 1:0] cfg_pattern;
+  logic [ 2:0] cfg_pattern;
   logic [23:0] cfg_color;
 
   assign cfg_en      = cfg_pix[0];
-  assign cfg_pattern = cfg_pix[2:1];
-  assign cfg_color   = cfg_pix[26:3];
+  assign cfg_pattern = cfg_pix[3:1];
+  assign cfg_color   = cfg_pix[27:4];
 
   // ============================================================ video timing
   hdmi_timing #(
@@ -132,6 +135,7 @@ module hdmi_if #(
 
   // ============================================================ pixel source
   logic [7:0] pat_r, pat_g, pat_b;
+  logic [7:0] strm_r, strm_g, strm_b;
   logic [7:0] pix_r, pix_g, pix_b;
 
   hdmi_pattern #(
@@ -140,18 +144,43 @@ module hdmi_if #(
   ) hdmi_pattern_i (
       .hpos_i   (pix_hpos),
       .vpos_i   (pix_vpos),
-      .pattern_i(cfg_pattern),
+      .pattern_i(cfg_pattern[1:0]),
       .color_i  (cfg_color),
       .red_o    (pat_r),
       .green_o  (pat_g),
       .blue_o   (pat_b)
   );
 
+  reg_req_t pixel_win_req;
+  reg_rsp_t pixel_win_rsp;
+
+  hdmi_pixel_stream #(
+      .reg_req_t(reg_req_t),
+      .reg_rsp_t(reg_rsp_t)
+  ) hdmi_pixel_stream_i (
+      .clk_i      (clk_i),
+      .rst_ni     (rst_ni),
+      .win_i      (pixel_win_req),
+      .win_o      (pixel_win_rsp),
+      .pclk_i     (pclk_i),
+      .pclk_rst_ni(pclk_rst_n),
+      .hpos_lsbs_i(pix_hpos[3:0]),
+      .de_i       (pix_de),
+      .red_o      (strm_r),
+      .green_o    (strm_g),
+      .blue_o     (strm_b)
+  );
+
+  logic [7:0] src_r, src_g, src_b;
+
+  assign {src_r, src_g, src_b} = (cfg_pattern == 3'd4) ? {strm_r, strm_g, strm_b} :
+                                                          {pat_r, pat_g, pat_b};
+
   // Disabling the output blacks out the picture but leaves the timing running,
   // so the monitor keeps its lock instead of dropping the mode.
-  assign pix_r = cfg_en ? pat_r : 8'h00;
-  assign pix_g = cfg_en ? pat_g : 8'h00;
-  assign pix_b = cfg_en ? pat_b : 8'h00;
+  assign pix_r = cfg_en ? src_r : 8'h00;
+  assign pix_g = cfg_en ? src_g : 8'h00;
+  assign pix_b = cfg_en ? src_b : 8'h00;
 
   // ============================================================ TMDS encoding
   // Channel 0 carries blue plus the two sync signals; the other two channels
@@ -226,6 +255,8 @@ module hdmi_if #(
       .hw2reg,
       .reg_req_i,
       .reg_rsp_o,
+      .reg_req_win_o(pixel_win_req),
+      .reg_rsp_win_i(pixel_win_rsp),
       .devmode_i(1'b0)
   );
 

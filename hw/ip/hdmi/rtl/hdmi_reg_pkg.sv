@@ -7,7 +7,7 @@
 package hdmi_reg_pkg;
 
   // Address widths within the block
-  parameter int BlockAw = 4;
+  parameter int BlockAw = 5;
 
   ////////////////////////////
   // Typedefs for registers //
@@ -15,7 +15,7 @@ package hdmi_reg_pkg;
 
   typedef struct packed {
     struct packed {logic q;} en;
-    struct packed {logic [1:0] q;} pattern;
+    struct packed {logic [2:0] q;} pattern;
   } hdmi_reg2hw_ctrl_reg_t;
 
   typedef struct packed {logic [23:0] q;} hdmi_reg2hw_color_reg_t;
@@ -32,7 +32,7 @@ package hdmi_reg_pkg;
 
   // Register -> HW type
   typedef struct packed {
-    hdmi_reg2hw_ctrl_reg_t  ctrl;   // [26:24]
+    hdmi_reg2hw_ctrl_reg_t  ctrl;   // [27:24]
     hdmi_reg2hw_color_reg_t color;  // [23:0]
   } hdmi_reg2hw_t;
 
@@ -43,10 +43,14 @@ package hdmi_reg_pkg;
   } hdmi_hw2reg_t;
 
   // Register offsets
-  parameter logic [BlockAw-1:0] HDMI_CTRL_OFFSET = 4'h0;
-  parameter logic [BlockAw-1:0] HDMI_COLOR_OFFSET = 4'h4;
-  parameter logic [BlockAw-1:0] HDMI_STATUS_OFFSET = 4'h8;
-  parameter logic [BlockAw-1:0] HDMI_FRAME_CNT_OFFSET = 4'hc;
+  parameter logic [BlockAw-1:0] HDMI_CTRL_OFFSET = 5'h0;
+  parameter logic [BlockAw-1:0] HDMI_COLOR_OFFSET = 5'h4;
+  parameter logic [BlockAw-1:0] HDMI_STATUS_OFFSET = 5'h8;
+  parameter logic [BlockAw-1:0] HDMI_FRAME_CNT_OFFSET = 5'hc;
+
+  // Window parameters
+  parameter logic [BlockAw-1:0] HDMI_PIXEL_OFFSET = 5'h10;
+  parameter int unsigned HDMI_PIXEL_SIZE = 'h4;
 
   // Register index
   typedef enum int {

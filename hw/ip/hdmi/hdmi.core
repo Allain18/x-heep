@@ -16,6 +16,8 @@ filesets:
     files:
     - rtl/hdmi_timing.sv
     - rtl/hdmi_pattern.sv
+    - rtl/hdmi_window.sv
+    - rtl/hdmi_pixel_stream.sv
     - rtl/hdmi_tmds_encoder.sv
     - rtl/hdmi_if.sv
     file_type: systemVerilogSource
