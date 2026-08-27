@@ -62,13 +62,10 @@ module camera_if #(
   logic                  fifo_pop;
   logic                  win_read;
 
-  assign hw2reg.control.d  = 1'b0;
-  assign hw2reg.control.de = 1'b0;
-
 
   // STATUS.RUNNING: a frame is being transmitted (vsync is active low here).
-  assign hw2reg.status.d   = ~cam_vsync;
-  assign hw2reg.status.de  = 1'b1;
+  assign hw2reg.status.d  = ~cam_vsync;
+  assign hw2reg.status.de = 1'b1;
 
   if (UseTestPattern) begin
     fake_signals fake_signals_i (
@@ -89,24 +86,28 @@ module camera_if #(
   always_ff @(cam_vsync) begin
     frame_active <= reg2hw.control.q & ~cam_vsync;
   end
+  // assign frame_active = reg2hw.control.q & ~cam_vsync;
 
   // Pack four pixel bytes into one bus word. hsync (href) is the per-byte
   // data-valid coming from the camera.
   always_ff @(posedge cam_pclk or negedge rst_ni) begin
+    //remove rst or 
     if (!rst_ni) begin
       word_shift <= '0;
       byte_cnt   <= '0;
       word_valid <= 1'b0;
-    end else if (!frame_active) begin
-      // Resynchronize on the word boundary at every frame/line gap.
-      byte_cnt   <= '0;
-      word_valid <= 1'b0;
     end else begin
-      word_valid <= 1'b0;
-      if (cam_href) begin
-        word_shift <= {word_shift[23:0], cam_data_i};
-        byte_cnt   <= byte_cnt + 2'd1;
-        word_valid <= (byte_cnt == 2'd3);
+      if (!frame_active) begin
+        // Resynchronize on the word boundary at every frame/line gap.
+        byte_cnt   <= '0;
+        word_valid <= 1'b0;
+      end else begin
+        word_valid <= 1'b0;
+        if (cam_href) begin
+          word_shift <= {word_shift[23:0], cam_data_i};
+          byte_cnt   <= byte_cnt + 2'd1;
+          word_valid <= (byte_cnt == 2'd3);
+        end
       end
     end
   end
