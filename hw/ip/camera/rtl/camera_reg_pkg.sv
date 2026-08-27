@@ -20,11 +20,6 @@ package camera_reg_pkg;
   typedef struct packed {
     logic d;
     logic de;
-  } camera_hw2reg_control_reg_t;
-
-  typedef struct packed {
-    logic d;
-    logic de;
   } camera_hw2reg_status_reg_t;
 
   // Register -> HW type
@@ -35,8 +30,7 @@ package camera_reg_pkg;
 
   // HW -> register type
   typedef struct packed {
-    camera_hw2reg_control_reg_t control;  // [3:2]
-    camera_hw2reg_status_reg_t  status;   // [1:0]
+    camera_hw2reg_status_reg_t status;  // [1:0]
   } camera_hw2reg_t;
 
   // Register offsets

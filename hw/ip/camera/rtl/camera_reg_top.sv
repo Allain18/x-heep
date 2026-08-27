@@ -112,8 +112,6 @@ module camera_reg_top #(
   logic control_wd;
   logic control_we;
   logic status_qs;
-  logic status_wd;
-  logic status_we;
 
   // Register instances
   // R[control]: V(False)
@@ -131,8 +129,8 @@ module camera_reg_top #(
       .wd(control_wd),
 
       // from internal hardware
-      .de(hw2reg.control.de),
-      .d (hw2reg.control.d),
+      .de(1'b0),
+      .d ('0),
 
       // to internal hardware
       .qe(),
@@ -147,15 +145,14 @@ module camera_reg_top #(
 
   prim_subreg #(
       .DW      (1),
-      .SWACCESS("RW"),
+      .SWACCESS("RO"),
       .RESVAL  (1'h0)
   ) u_status (
       .clk_i (clk_i),
       .rst_ni(rst_ni),
 
-      // from register interface
-      .we(status_we),
-      .wd(status_wd),
+      .we(1'b0),
+      .wd('0),
 
       // from internal hardware
       .de(hw2reg.status.de),
@@ -190,9 +187,6 @@ module camera_reg_top #(
 
   assign control_we = addr_hit[0] & reg_we & !reg_error;
   assign control_wd = reg_wdata[0];
-
-  assign status_we  = addr_hit[1] & reg_we & !reg_error;
-  assign status_wd  = reg_wdata[0];
 
   // Read data return
   always_comb begin

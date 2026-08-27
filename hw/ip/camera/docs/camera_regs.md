@@ -32,13 +32,13 @@ Status register for flash controller
 ### Fields
 
 ```wavejson
-{"reg": [{"name": "RUNNING", "bits": 1, "attr": ["rw"], "rotate": -90}, {"bits": 31}], "config": {"lanes": 1, "fontsize": 10, "vspace": 90}}
+{"reg": [{"name": "RUNNING", "bits": 1, "attr": ["ro"], "rotate": -90}, {"bits": 31}], "config": {"lanes": 1, "fontsize": 10, "vspace": 90}}
 ```
 
 |  Bits  |  Type  |  Reset  | Name    | Description      |
 |:------:|:------:|:-------:|:--------|:-----------------|
 |  31:1  |        |         |         | Reserved         |
-|   0    |   rw   |   0x0   | RUNNING | Frame is running |
+|   0    |   ro   |   0x0   | RUNNING | Frame is running |
 
 ## DATA
 Camera data window.
