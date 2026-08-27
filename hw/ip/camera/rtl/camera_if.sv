@@ -33,6 +33,8 @@ module camera_if #(
 
   localparam bit UseTestPattern = 1;
   logic                  cam_pclk;
+  logic                  cam_href;
+  logic                  cam_vsync;
 
   // ============== REGISTER SIGNALS ==============
   camera_reg2hw_t        reg2hw;
@@ -60,20 +62,32 @@ module camera_if #(
   logic                  fifo_pop;
   logic                  win_read;
 
-  assign hw2reg.control.d = 1'b0;
+  assign hw2reg.control.d  = 1'b0;
   assign hw2reg.control.de = 1'b0;
 
 
   // STATUS.RUNNING: a frame is being transmitted (vsync is active low here).
-  assign hw2reg.status.d = ~cam_vsync_i;
-  assign hw2reg.status.de = 1'b1;
+  assign hw2reg.status.d   = ~cam_vsync;
+  assign hw2reg.status.de  = 1'b1;
 
-  assign cam_pclk = UseTestPattern ? clk_i : cam_pclk_i;
+  if (UseTestPattern) begin
+    fake_signals fake_signals_i (
+        .clk_i,
+        .rst_ni,
+        .pclk_o (cam_pclk),
+        .vsync_o(cam_vsync),
+        .href_o (cam_href)
+    );
+  end else begin
+    assign cam_pclk  = cam_pclk_i;
+    assign cam_vsync = cam_vsync_i;
+    assign cam_href  = cam_href_i;
+  end
 
 
   // Enable: software armed the capture and we are inside a frame.
-  always_ff @(cam_vsync_i) begin
-    frame_active <= reg2hw.control.q & ~cam_vsync_i;
+  always_ff @(cam_vsync) begin
+    frame_active <= reg2hw.control.q & ~cam_vsync;
   end
 
   // Pack four pixel bytes into one bus word. hsync (href) is the per-byte
@@ -89,7 +103,7 @@ module camera_if #(
       word_valid <= 1'b0;
     end else begin
       word_valid <= 1'b0;
-      if (cam_href_i) begin
+      if (cam_href) begin
         word_shift <= {word_shift[23:0], cam_data_i};
         byte_cnt   <= byte_cnt + 2'd1;
         word_valid <= (byte_cnt == 2'd3);
