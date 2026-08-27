@@ -726,7 +726,7 @@ module peripheral_subsystem #(
     .reg_rsp_o(peripheral_slv_rsp[core_v_mini_mcu_pkg::CAMERA_IDX]),
 
     .cam_pclk_i(camera_pclk_i),
-    .cam_hsync_i(camera_href_i),
+    .cam_href_i(camera_href_i),
     .cam_vsync_i(camera_vsync_i),
     .cam_data_i(camera_data_i)
   );

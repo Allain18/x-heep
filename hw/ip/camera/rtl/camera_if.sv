@@ -23,7 +23,7 @@ module camera_if #(
 
     // Input from camera
     input logic       cam_pclk_i,
-    input logic       cam_hsync_i,
+    input logic       cam_href_i,
     input logic       cam_vsync_i,
     input logic [7:0] cam_data_i
 );
@@ -89,7 +89,7 @@ module camera_if #(
       word_valid <= 1'b0;
     end else begin
       word_valid <= 1'b0;
-      if (cam_hsync_i) begin
+      if (cam_href_i) begin
         word_shift <= {word_shift[23:0], cam_data_i};
         byte_cnt   <= byte_cnt + 2'd1;
         word_valid <= (byte_cnt == 2'd3);
