@@ -16,10 +16,9 @@
 //
 // Pixel source: hdmi_pattern (patterns 0-3) or hdmi_pixel_stream (pattern 4).
 // hdmi_pixel_stream has no frame buffer either, just a shallow CDC FIFO fed
-// through the PIXEL register window; software (via DMA) is expected to
-// re-push the whole image every frame. The eventual camera path is meant to
-// write through the same window, either directly or via DMA, in place of
-// today's CPU/DMA-filled test array.
+// through the PIXEL register window, one word per screen pixel at native
+// resolution; a DMA transfer (e.g. straight from the camera peripheral's own
+// window) is expected to re-push the whole frame every ~16ms.
 
 module hdmi_if #(
     // Register interface data types
@@ -164,7 +163,6 @@ module hdmi_if #(
       .win_o      (pixel_win_rsp),
       .pclk_i     (pclk_i),
       .pclk_rst_ni(pclk_rst_n),
-      .hpos_lsbs_i(pix_hpos[3:0]),
       .de_i       (pix_de),
       .red_o      (strm_r),
       .green_o    (strm_g),

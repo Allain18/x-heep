@@ -3,19 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 
 // Pixel source for pattern 4: software (via DMA) pushes one 0x00RRGGBB word
-// per pixel, in raster order (row-major, 40x30), through the PIXEL register
-// window. There is deliberately no frame buffer here, only a shallow CDC
-// FIFO between the bus and pixel clock domains, matching the same
-// cdc_fifo_gray primitive camera_if.sv already uses for its own DATA
-// window. Because there is no frame buffer, the whole 1200-word image has
+// per screen pixel, in raster order (row-major, matching HActive x VActive
+// 1:1 -- no replication, so this only makes sense at native resolution),
+// through the PIXEL register window. There is deliberately no frame buffer
+// here, only a shallow CDC FIFO between the bus and pixel clock domains,
+// matching the same cdc_fifo_gray primitive camera_if.sv already uses for
+// its own DATA window. Because there is no frame buffer, the whole frame has
 // to be re-pushed roughly every 16ms (once per HDMI frame) or the picture
 // starts showing stale pixels; a write to the window stalls while the FIFO
-// is full, which is what paces a DMA transfer through it.
+// is full, which is what paces a DMA transfer through it -- including one
+// sourced directly from another peripheral's window, such as the camera's,
+// with no CPU involvement per pixel.
 //
 // The pixel-domain side never stalls: video timing runs in real time and
-// cannot pause for data. If a new pixel is due (every 16 hpos columns, one
-// cell of the 40x30 grid) and the FIFO is empty, the previously displayed
-// pixel is held instead of glitching.
+// cannot pause for data. If a new pixel is due (every active hpos column)
+// and the FIFO is empty, the previously displayed pixel is held instead of
+// glitching.
 //
 // Without more, that "hold instead of stalling" behaviour is exactly what
 // makes the picture drift: every time a pop finds the FIFO empty, the raster
@@ -47,10 +50,9 @@ module hdmi_pixel_stream #(
     output reg_rsp_t win_o,
 
     // Pixel clock domain: raster position
-    input logic       pclk_i,
-    input logic       pclk_rst_ni,
-    input logic [3:0] hpos_lsbs_i,  // hpos_i[3:0]; only the block boundary matters here
-    input logic       de_i,
+    input logic pclk_i,
+    input logic pclk_rst_ni,
+    input logic de_i,
 
     output logic [7:0] red_o,
     output logic [7:0] green_o,
@@ -91,9 +93,9 @@ module hdmi_pixel_stream #(
       .dst_ready_i(pop_pop)
   );
 
-  // A new pixel is due at every 16-pixel block boundary in the active area.
+  // A new pixel is due on every active-area cycle: 1:1 with the screen.
   logic advance;
-  assign advance = de_i && (hpos_lsbs_i == 4'h0);
+  assign advance = de_i;
 
   // Drain whatever is left in the FIFO for a short window right after the
   // active area ends, so the next frame starts from empty. See the header

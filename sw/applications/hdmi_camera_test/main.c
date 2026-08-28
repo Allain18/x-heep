@@ -2,34 +2,56 @@
 // Solderpad Hardware License, Version 2.1, see LICENSE.md for details.
 // SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 
-// DMA-fed pixel stream display test.
+// Camera -> HDMI DMA bridge.
 //
-// There is no real camera hooked up yet, and deliberately no frame buffer in
-// the HDMI peripheral either: the final design is meant to stream camera
-// pixels through the PIXEL register window (see hdmi_pixel_stream.sv), most
-// likely via DMA. This app stands in for the camera with a fixed 40x30 test
-// image (white border, green marker block near the top-left corner,
-// gradient fill) and pushes it into that same window using the DMA, so the
-// DMA-to-HDMI path gets exercised now and the camera can slot in later
-// without changing how the picture reaches the screen.
+// Bridges the camera peripheral's live pixel stream straight into the HDMI
+// PIXEL window via DMA: source is the camera's DATA window, destination is
+// hdmi_peri->PIXEL, both fixed (non-incrementing) addresses. No CPU touches
+// individual pixels, and there is no frame buffer anywhere in the path --
+// both windows are simple bus-backpressured FIFOs (camera_window.sv /
+// hdmi_window.sv), so the DMA transfer naturally paces itself to whichever
+// side is slower. This works as a single DMA transaction with both targets
+// set to DMA_TRIG_MEMORY (fixed addresses standing in for peripherals, not
+// real trigger slots), the same way each side already works on its own in
+// sw/applications/camera and hdmi_camera_test's earlier DMA-fed test image.
 //
-// hdmi_pixel_stream.sv holds only a shallow FIFO, not a full frame: the
-// picture would start showing stale pixels within one frame if pushed only
-// once, so this app keeps re-launching the same DMA transfer forever. Each
-// transfer stalls on the window's backpressure until hdmi_pixel_stream.sv
-// has drained room for more, which happens to pace the loop to roughly the
-// HDMI frame rate without an explicit vsync wait. hdmi_pixel_stream.sv also
-// flushes any leftover words from the previous frame during blanking, so
-// this loop doesn't need to land its writes on any particular phase of the
-// frame to stay in sync -- being close is enough.
+// The camera is natively 640x480, matching HDMI's active area exactly, so
+// hdmi_pixel_stream.sv pushes one word per screen pixel with no replication
+// (see that file). It still flushes any stale FIFO contents every HDMI
+// frame, so the picture won't progressively drift/scroll even when this
+// loop's timing doesn't line up with the frame boundary -- each burst just
+// resumes wherever the previous one left off relative to the screen raster.
+//
+// Known caveats, both pre-existing and orthogonal to this bridge:
+//  - camera_if.sv currently has UseTestPattern hardcoded on, so what
+//    actually streams through right now is a free-running counter
+//    (0xA9A8A7A6, ...), not real sensor pixels, until that capture path is
+//    finished and verified against real camera hardware. Through this
+//    bridge that shows up as a slow sweep of colour across the screen,
+//    which at least proves data is flowing end to end.
+//  - camera_if.sv also doesn't yet convert whatever pixel format the real
+//    sensor produces (e.g. RGB565, 2 bytes/pixel) into the 0x00RRGGBB the
+//    PIXEL window expects: that repacking has to be added before real
+//    sensor data will show correct colours here.
+//  - Moving a full 640x480 frame one 32-bit word at a time over a 15 MHz
+//    bus is nowhere near the bandwidth real-time video needs; expect the
+//    picture to update slowly (a fraction of a frame per DMA burst) rather
+//    than smoothly, until a wider/bulkier transfer path replaces this
+//    word-at-a-time bridge.
 
 #include <stdint.h>
 #include <stdio.h>
 
+#include "camera_regs.h"
+#include "camera_structs.h"
 #include "dma.h"
 #include "hdmi_regs.h"
 #include "hdmi_structs.h"
 #include "x-heep.h"
+
+#ifndef CAMERA_IS_INCLUDED
+#error ("This app does NOT work as the CAMERA peripheral is not included")
+#endif
 
 #ifndef HDMI_IS_INCLUDED
 #error ("This app does NOT work as the HDMI peripheral is not included")
@@ -37,54 +59,24 @@
 
 #define HDMI_PATTERN_STREAM 4
 
-#define IMG_COLS 40
-#define IMG_ROWS 30
+#define IMG_COLS 640
+#define IMG_ROWS 480
 #define IMG_PIXELS (IMG_COLS * IMG_ROWS)
 
-// One 0x00RRGGBB word per pixel: matches what hdmi_pixel_stream.sv expects
-// through the PIXEL window, and the layout the COLOR register already uses.
-static uint32_t array_small_image[IMG_PIXELS] __attribute__((aligned(4)));
-
-static void fill_test_image(void) {
-  for (unsigned row = 0; row < IMG_ROWS; row++) {
-    for (unsigned col = 0; col < IMG_COLS; col++) {
-      uint8_t r, g, b;
-      int border = (row == 0) || (row == IMG_ROWS - 1) || (col == 0) ||
-                   (col == IMG_COLS - 1);
-      int marker = (row >= 2) && (row < 6) && (col >= 2) && (col < 6);
-
-      if (border) {
-        r = g = b = 0xFF;
-      } else if (marker) {
-        r = 0x00;
-        g = 0xFF;
-        b = 0x00;
-      } else {
-        r = col * (256 / IMG_COLS);
-        g = row * (256 / IMG_ROWS);
-        b = 0x80;
-      }
-
-      array_small_image[row * IMG_COLS + col] =
-          ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
-    }
-  }
-}
-
 int main(void) {
-  printf("=== HDMI DMA pixel stream test ===\n");
-  printf("40x30 test image, re-pushed through DMA every frame\n");
-
-  fill_test_image();
+  printf("=== Camera -> HDMI DMA bridge ===\n");
+  printf("640x480, one word per pixel, no frame buffer\n");
 
   hdmi_peri->CTRL = (1 << HDMI_CTRL_EN_BIT) |
                     (HDMI_PATTERN_STREAM << HDMI_CTRL_PATTERN_OFFSET);
 
+  camera_peri->CONTROL |= (0x1 << CAMERA_CONTROL_START_BIT);
+
   dma_init(NULL);
 
   static dma_target_t tgt_src = {
-      .ptr       = (uint8_t *)array_small_image,
-      .inc_d1_du = 1,
+      .ptr = (uint8_t *)((uintptr_t)camera_peri + CAMERA_DATA_REG_OFFSET),
+      .inc_d1_du = 0,  // fixed address: every read drains the camera's FIFO
       .trig      = DMA_TRIG_MEMORY,
       .type      = DMA_DATA_TYPE_WORD,
   };
