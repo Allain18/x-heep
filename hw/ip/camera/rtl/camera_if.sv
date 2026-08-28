@@ -81,9 +81,11 @@ module camera_if #(
     fake_signals fake_signals_i (
         .clk_i,
         .rst_ni,
-        .pclk_o (cam_pclk),
+        .pclk_o(cam_pclk),
         .vsync_o(cam_vsync),
-        .href_o (cam_href)
+        .href_o(cam_href),
+        .pattern_inc_i(fifo_src_valid & fifo_src_ready),
+        .test_pattern_o(test_pattern)
     );
   end else begin
     assign cam_pclk  = cam_pclk_i;
@@ -122,14 +124,6 @@ module camera_if #(
     end
   end
 
-  // Placeholder payload: increments once per pushed word.
-  always_ff @(posedge cam_pclk or negedge rst_ni) begin
-    if (!rst_ni) begin
-      test_pattern <= 32'hA9A8A7A6;
-    end else if (fifo_src_valid & fifo_src_ready) begin
-      test_pattern <= test_pattern + 32'd1;
-    end
-  end
 
   assign fifo_wdata     = UseTestPattern ? test_pattern : word_shift;
 

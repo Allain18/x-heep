@@ -11,7 +11,9 @@ module fake_signals #(
 
     output logic pclk_o,
     output logic vsync_o,
-    output logic href_o
+    output logic href_o,
+    input logic pattern_inc_i,
+    output logic [31:0] test_pattern_o
 );
 
   int x;
@@ -38,6 +40,16 @@ module fake_signals #(
     end
   end
   // assign armed = 1;
+
+
+  // Placeholder payload: increments once per pushed word.
+  always_ff @(posedge pclk_o or negedge rst_ni) begin
+    if (!rst_ni) begin
+      test_pattern_o <= 32'hA9A8A7A6;
+    end else if (pattern_inc_i) begin
+      test_pattern_o <= test_pattern_o + 32'd1;
+    end
+  end
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (~rst_ni || !armed) begin
