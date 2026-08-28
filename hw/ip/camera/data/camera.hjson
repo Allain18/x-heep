@@ -11,6 +11,8 @@
       swaccess: "rw"
       hwaccess: "hro"
       fields: [
+        { bits: "2", name: "RESET", desc: "Control the camera reset", resval: "0x0" }
+        { bits: "1", name: "PWND", desc: "Control the camera power-down", resval: "0x0" }
         { bits: "0", name: "START", desc: "Start operation", resval: "0x0" }
       ]
     }

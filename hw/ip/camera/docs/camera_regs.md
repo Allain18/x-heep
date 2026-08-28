@@ -10,18 +10,20 @@
 Control register for flash controller
 - Offset: `0x0`
 - Reset default: `0x0`
-- Reset mask: `0x1`
+- Reset mask: `0x7`
 
 ### Fields
 
 ```wavejson
-{"reg": [{"name": "START", "bits": 1, "attr": ["rw"], "rotate": -90}, {"bits": 31}], "config": {"lanes": 1, "fontsize": 10, "vspace": 80}}
+{"reg": [{"name": "START", "bits": 1, "attr": ["rw"], "rotate": -90}, {"name": "PWND", "bits": 1, "attr": ["rw"], "rotate": -90}, {"name": "RESET", "bits": 1, "attr": ["rw"], "rotate": -90}, {"bits": 29}], "config": {"lanes": 1, "fontsize": 10, "vspace": 80}}
 ```
 
-|  Bits  |  Type  |  Reset  | Name   | Description     |
-|:------:|:------:|:-------:|:-------|:----------------|
-|  31:1  |        |         |        | Reserved        |
-|   0    |   rw   |   0x0   | START  | Start operation |
+|  Bits  |  Type  |  Reset  | Name   | Description                   |
+|:------:|:------:|:-------:|:-------|:------------------------------|
+|  31:3  |        |         |        | Reserved                      |
+|   2    |   rw   |   0x0   | RESET  | Control the camera reset      |
+|   1    |   rw   |   0x0   | PWND   | Control the camera power-down |
+|   0    |   rw   |   0x0   | START  | Start operation               |
 
 ## STATUS
 Status register for flash controller

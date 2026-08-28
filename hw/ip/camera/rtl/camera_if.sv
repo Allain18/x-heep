@@ -21,6 +21,11 @@ module camera_if #(
     input  reg_req_t reg_req_i,
     output reg_rsp_t reg_rsp_o,
 
+    // Output to camera
+    output logic cam_xclk_o,
+    output logic cam_rst_o,
+    output logic cam_pwnd_o,
+
     // Input from camera
     input logic       cam_pclk_i,
     input logic       cam_href_i,
@@ -62,9 +67,14 @@ module camera_if #(
   logic                  fifo_pop;
   logic                  win_read;
 
+  // Camera control
+  assign cam_xclk_o = clk_i;
+  assign cam_rst_o = reg2hw.control.reset.q;
+  assign cam_pwnd_o = reg2hw.control.pwnd.q;
+
 
   // STATUS.RUNNING: a frame is being transmitted (vsync is active low here).
-  assign hw2reg.status.d  = ~cam_vsync;
+  assign hw2reg.status.d = ~cam_vsync;
   assign hw2reg.status.de = 1'b1;
 
   if (UseTestPattern) begin
@@ -84,7 +94,7 @@ module camera_if #(
 
   // Enable: software armed the capture and we are inside a frame.
   always_ff @(cam_vsync) begin
-    frame_active <= reg2hw.control.q & ~cam_vsync;
+    frame_active <= reg2hw.control.start.q & ~cam_vsync;
   end
   // assign frame_active = reg2hw.control.q & ~cam_vsync;
 

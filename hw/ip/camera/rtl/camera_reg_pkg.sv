@@ -13,7 +13,11 @@ package camera_reg_pkg;
   // Typedefs for registers //
   ////////////////////////////
 
-  typedef struct packed {logic q;} camera_reg2hw_control_reg_t;
+  typedef struct packed {
+    struct packed {logic q;} start;
+    struct packed {logic q;} pwnd;
+    struct packed {logic q;} reset;
+  } camera_reg2hw_control_reg_t;
 
   typedef struct packed {logic q;} camera_reg2hw_status_reg_t;
 
@@ -24,7 +28,7 @@ package camera_reg_pkg;
 
   // Register -> HW type
   typedef struct packed {
-    camera_reg2hw_control_reg_t control;  // [1:1]
+    camera_reg2hw_control_reg_t control;  // [3:1]
     camera_reg2hw_status_reg_t  status;   // [0:0]
   } camera_reg2hw_t;
 

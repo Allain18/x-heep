@@ -108,25 +108,32 @@ module camera_reg_top #(
   // Define SW related signals
   // Format: <reg>_<field>_{wd|we|qs}
   //        or <reg>_{wd|we|qs} if field == 1 or 0
-  logic control_qs;
-  logic control_wd;
-  logic control_we;
+  logic control_start_qs;
+  logic control_start_wd;
+  logic control_start_we;
+  logic control_pwnd_qs;
+  logic control_pwnd_wd;
+  logic control_pwnd_we;
+  logic control_reset_qs;
+  logic control_reset_wd;
+  logic control_reset_we;
   logic status_qs;
 
   // Register instances
   // R[control]: V(False)
 
+  //   F[start]: 0:0
   prim_subreg #(
       .DW      (1),
       .SWACCESS("RW"),
       .RESVAL  (1'h0)
-  ) u_control (
+  ) u_control_start (
       .clk_i (clk_i),
       .rst_ni(rst_ni),
 
       // from register interface
-      .we(control_we),
-      .wd(control_wd),
+      .we(control_start_we),
+      .wd(control_start_wd),
 
       // from internal hardware
       .de(1'b0),
@@ -134,10 +141,62 @@ module camera_reg_top #(
 
       // to internal hardware
       .qe(),
-      .q (reg2hw.control.q),
+      .q (reg2hw.control.start.q),
 
       // to register interface (read)
-      .qs(control_qs)
+      .qs(control_start_qs)
+  );
+
+
+  //   F[pwnd]: 1:1
+  prim_subreg #(
+      .DW      (1),
+      .SWACCESS("RW"),
+      .RESVAL  (1'h0)
+  ) u_control_pwnd (
+      .clk_i (clk_i),
+      .rst_ni(rst_ni),
+
+      // from register interface
+      .we(control_pwnd_we),
+      .wd(control_pwnd_wd),
+
+      // from internal hardware
+      .de(1'b0),
+      .d ('0),
+
+      // to internal hardware
+      .qe(),
+      .q (reg2hw.control.pwnd.q),
+
+      // to register interface (read)
+      .qs(control_pwnd_qs)
+  );
+
+
+  //   F[reset]: 2:2
+  prim_subreg #(
+      .DW      (1),
+      .SWACCESS("RW"),
+      .RESVAL  (1'h0)
+  ) u_control_reset (
+      .clk_i (clk_i),
+      .rst_ni(rst_ni),
+
+      // from register interface
+      .we(control_reset_we),
+      .wd(control_reset_wd),
+
+      // from internal hardware
+      .de(1'b0),
+      .d ('0),
+
+      // to internal hardware
+      .qe(),
+      .q (reg2hw.control.reset.q),
+
+      // to register interface (read)
+      .qs(control_reset_qs)
   );
 
 
@@ -185,15 +244,23 @@ module camera_reg_top #(
                (addr_hit[1] & (|(CAMERA_PERMIT[1] & ~reg_be)))));
   end
 
-  assign control_we = addr_hit[0] & reg_we & !reg_error;
-  assign control_wd = reg_wdata[0];
+  assign control_start_we = addr_hit[0] & reg_we & !reg_error;
+  assign control_start_wd = reg_wdata[0];
+
+  assign control_pwnd_we  = addr_hit[0] & reg_we & !reg_error;
+  assign control_pwnd_wd  = reg_wdata[1];
+
+  assign control_reset_we = addr_hit[0] & reg_we & !reg_error;
+  assign control_reset_wd = reg_wdata[2];
 
   // Read data return
   always_comb begin
     reg_rdata_next = '0;
     unique case (1'b1)
       addr_hit[0]: begin
-        reg_rdata_next[0] = control_qs;
+        reg_rdata_next[0] = control_start_qs;
+        reg_rdata_next[1] = control_pwnd_qs;
+        reg_rdata_next[2] = control_reset_qs;
       end
 
       addr_hit[1]: begin
