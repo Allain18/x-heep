@@ -12,7 +12,8 @@ module camera_if #(
     parameter type reg_req_t = logic,
     parameter type reg_rsp_t = logic,
 
-    parameter int unsigned FifoLogDepth = 5
+    parameter int unsigned FifoLogDepth = 5,
+    parameter logic UseTestPattern = 1
 ) (
     input logic clk_i,
     input logic rst_ni,
@@ -36,7 +37,6 @@ module camera_if #(
   // ============== PACKAGE IMPORTS ==============
   import camera_reg_pkg::*;
 
-  localparam bit UseTestPattern = 1;
   logic                  cam_pclk;
   logic                  cam_href;
   logic                  cam_vsync;
@@ -52,6 +52,7 @@ module camera_if #(
   // ============== OTHER SIGNALS ==============
 
   // Camera (cam_pclk_i) domain
+  logic                  start_sync;
   logic                  frame_active;
   logic           [31:0] word_shift;
   logic           [ 1:0] byte_cnt;
@@ -94,11 +95,22 @@ module camera_if #(
   end
 
 
+  // reg2hw.control.start.q is set in the clk_i (bus) domain; synchronize it
+  // into the cam_pclk domain before using it in any camera-domain logic.
+  sync #(
+      .STAGES(2)
+  ) start_sync_i (
+      .clk_i     (cam_pclk),
+      .rst_ni,
+      .serial_i  (reg2hw.control.start.q),
+      .serial_o  (start_sync)
+  );
+
   // Enable: software armed the capture and we are inside a frame.
-  always_ff @(cam_vsync) begin
-    frame_active <= reg2hw.control.start.q & ~cam_vsync;
+  always_ff @(posedge cam_pclk or negedge rst_ni) begin
+    if (!rst_ni) frame_active <= 1'b0;
+    else frame_active <= start_sync & ~cam_vsync;
   end
-  // assign frame_active = reg2hw.control.q & ~cam_vsync;
 
   // Pack four pixel bytes into one bus word. hsync (href) is the per-byte
   // data-valid coming from the camera.
