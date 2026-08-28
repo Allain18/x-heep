@@ -15,10 +15,25 @@
 // The pixel-domain side never stalls: video timing runs in real time and
 // cannot pause for data. If a new pixel is due (every 16 hpos columns, one
 // cell of the 40x30 grid) and the FIFO is empty, the previously displayed
-// pixel is held instead of glitching. Correctness of the picture therefore
-// depends on software keeping exactly one push in flight per 16x16 block,
-// 1200 pushes per frame: there is no automatic resynchronisation at frame
-// boundaries.
+// pixel is held instead of glitching.
+//
+// Without more, that "hold instead of stalling" behaviour is exactly what
+// makes the picture drift: every time a pop finds the FIFO empty, the raster
+// moves on to the next cell while the FIFO's next word is still the one that
+// was meant for the cell that was just skipped. Every following word then
+// lands one cell later than intended, forever, since nothing ever
+// resynchronises: the picture visibly scrolls, a little more each frame.
+//
+// The fix is to flush any leftover words from the previous frame during the
+// blanking gap, so each frame starts from a known-empty FIFO. This is a
+// plain, always-safe pop (dst_ready_i), not a cross-domain reset: nothing
+// analogous to cdc_fifo_gray_clearable's src/dst_clear_i handshake is
+// needed. The drain window is a fixed, short number of pclk_i cycles right
+// after the active area ends -- comfortably longer than it takes to flush a
+// full FIFO (a handful of cycles), comfortably shorter than blanking itself
+// (~26000 cycles) or than software can plausibly restart its DMA burst (bus
+// round-trip plus several driver calls), so it only ever discards the
+// outgoing frame's stale tail, never the incoming frame's first real pixel.
 
 module hdmi_pixel_stream #(
     parameter type reg_req_t = logic,
@@ -79,7 +94,32 @@ module hdmi_pixel_stream #(
   // A new pixel is due at every 16-pixel block boundary in the active area.
   logic advance;
   assign advance = de_i && (hpos_lsbs_i == 4'h0);
-  assign pop_pop = advance && pop_valid;
+
+  // Drain whatever is left in the FIFO for a short window right after the
+  // active area ends, so the next frame starts from empty. See the header
+  // comment for why this window's length is safe.
+  localparam int unsigned FifoDepth = 2 ** FifoLogDepth;
+  localparam int unsigned DrainCycles = 4 * FifoDepth;
+  localparam int unsigned DrainCntWidth = $clog2(DrainCycles + 1);
+
+  logic de_q;
+  logic [DrainCntWidth-1:0] drain_cnt;
+  logic draining;
+
+  assign draining = (drain_cnt != '0);
+
+  always_ff @(posedge pclk_i or negedge pclk_rst_ni) begin
+    if (!pclk_rst_ni) begin
+      de_q      <= 1'b0;
+      drain_cnt <= '0;
+    end else begin
+      de_q <= de_i;
+      if (de_q && !de_i) drain_cnt <= DrainCntWidth'(DrainCycles);
+      else if (draining) drain_cnt <= drain_cnt - 1'b1;
+    end
+  end
+
+  assign pop_pop = pop_valid && (advance || draining);
 
   logic [23:0] held_pixel;
 

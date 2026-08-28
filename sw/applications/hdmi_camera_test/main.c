@@ -18,7 +18,10 @@
 // once, so this app keeps re-launching the same DMA transfer forever. Each
 // transfer stalls on the window's backpressure until hdmi_pixel_stream.sv
 // has drained room for more, which happens to pace the loop to roughly the
-// HDMI frame rate without an explicit vsync wait.
+// HDMI frame rate without an explicit vsync wait. hdmi_pixel_stream.sv also
+// flushes any leftover words from the previous frame during blanking, so
+// this loop doesn't need to land its writes on any particular phase of the
+// frame to stay in sync -- being close is enough.
 
 #include <stdint.h>
 #include <stdio.h>
