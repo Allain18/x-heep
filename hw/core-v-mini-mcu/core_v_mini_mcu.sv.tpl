@@ -598,6 +598,10 @@ module core_v_mini_mcu #(
       % endif
       .uart_rx_i,
       .uart_tx_o,
+      % if user_peripheral_domain.contains_peripheral('camera'):
+      .camera_xclk_o(cam_xclk_o),
+      .camera_rst_o(cam_rst_o),
+      .camera_pwnd_o(cam_pwnd_o),
       .camera_pclk_i(cam_pclk_i),
       .camera_vsync_i(cam_vsync_i),
       .camera_href_i(cam_href_i),
@@ -609,6 +613,7 @@ module core_v_mini_mcu #(
       .camera_data_5_i(cam_data_5_i),
       .camera_data_6_i(cam_data_6_i),
       .camera_data_7_i(cam_data_7_i),
+      % endif
       .hdmi_pclk_i,
       .hdmi_tmds_ch0_o,
       .hdmi_tmds_ch1_o,
@@ -648,8 +653,5 @@ module core_v_mini_mcu #(
       %endif
     % endif
   % endfor
-
-  assign cam_xclk_o = clk_i;
-
 
 endmodule  // core_v_mini_mcu

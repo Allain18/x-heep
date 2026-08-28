@@ -65,5 +65,6 @@ lint_off -rule UNDRIVEN -file "*/core_v_mini_mcu.sv" -match "Signal is not drive
 lint_off -rule UNDRIVEN -file "*/core_v_mini_mcu.sv" -match "Signal is not driven: 'cam_data*"
 lint_off -rule UNDRIVEN -file "*/core_v_mini_mcu.sv" -match "Signal is not driven: 'spi*"
 lint_off -rule UNDRIVEN -file "*/core_v_mini_mcu.sv" -match "Signal is not driven: 'pdm2pcm*"
+lint_off -rule UNDRIVEN -file "*/core_v_mini_mcu.sv" -match "Signal is not driven: 'cam*"
 lint_off -rule IMPLICIT -file "*/core_v_mini_mcu.sv" -match "Signal definition not found, creating implicitly: 'spi*'"
 lint_off -rule IMPLICIT -file "*/core_v_mini_mcu.sv" -match "Signal definition not found, creating implicitly: 'pdm2pcm*'"

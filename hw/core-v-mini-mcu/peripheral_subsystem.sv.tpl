@@ -111,6 +111,10 @@ module peripheral_subsystem #(
     input  logic pdm2pcm_pdm_i,
 
     // Camera
+    % if user_peripheral_domain.contains_peripheral('camera'):
+    output logic camera_xclk_o,
+    output logic camera_rst_o,
+    output logic camera_pwnd_o,
     input logic camera_pclk_i,
     input logic camera_vsync_i,
     input logic camera_href_i,
@@ -122,6 +126,7 @@ module peripheral_subsystem #(
     input logic camera_data_5_i,
     input logic camera_data_6_i,
     input logic camera_data_7_i,
+    % endif
 
     // HDMI. Not pad signals: the pixel clock comes from the FPGA clocking
     // resources and the TMDS words go to device-specific serialisers, both of
@@ -725,6 +730,9 @@ module peripheral_subsystem #(
     .reg_req_i(peripheral_slv_req[core_v_mini_mcu_pkg::CAMERA_IDX]),
     .reg_rsp_o(peripheral_slv_rsp[core_v_mini_mcu_pkg::CAMERA_IDX]),
 
+    .cam_xclk_o(camera_xclk_o),
+    .cam_rst_o(camera_rst_o),
+    .cam_pwnd_o(camera_pwnd_o),
     .cam_pclk_i(camera_pclk_i),
     .cam_href_i(camera_href_i),
     .cam_vsync_i(camera_vsync_i),
