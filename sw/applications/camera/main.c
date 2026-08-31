@@ -33,18 +33,14 @@
 // P15 (arduino_direct_iic_scl_io) -> SCL
 // P16 (arduino_direct_iic_sda_io) -> SDA
 
-// i2c random address for testing
-#define LSM6DSO_I2C_ADDR 0x6B
-#define LSM6DSO_WHO_AM_I 0x0F
+// i2c adress of the camera
+#define OV7670_ADDR_W 0x42
+#define OV7670_ADDR_R 0x43
 
 uint16_t rgb565[2000];
 // volatile uint16_t rgb565[1000];
 
-/* ============================================================
- * Test Main
- * ============================================================ */
-int main(void) {
-  // Configure the pad control to set the correct mux for the camera interface
+void set_pad(void) {
   pad_control_t pad_control;
   pad_control.base_addr =
       mmio_region_from_addr((uintptr_t)PAD_CONTROL_START_ADDRESS);
@@ -72,6 +68,42 @@ int main(void) {
                       (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_12_REG_OFFSET), 1);
   pad_control_set_mux(&pad_control,
                       (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_13_REG_OFFSET), 1);
+}
+
+// Initialize the camera via I2C
+// value takken from
+// https://github.com/EPFL-LAP/cs476/blob/main/virtualprototype/programs/support/src/ov7670.c
+uint8_t camera_i2c_init() {
+  uint8_t config_value = 0x80;  // reset all registers to default values
+  if (i2c_write(OV7670_ADDR_W, 0x12, &config_value, 1) != kDifI2cOk) return 1;
+
+  config_value = 0xF6;  // href
+  if (i2c_write(OV7670_ADDR_W, 0x32, &config_value, 1) != kDifI2cOk) return 1;
+
+  config_value = 0x13;  // hstart
+  if (i2c_write(OV7670_ADDR_W, 0x17, &config_value, 1) != kDifI2cOk) return 1;
+
+  config_value = 0x01;  // hstop
+  if (i2c_write(OV7670_ADDR_W, 0x18, &config_value, 1) != kDifI2cOk) return 1;
+
+  config_value = 0x02;  // vstrt
+  if (i2c_write(OV7670_ADDR_W, 0x19, &config_value, 1) != kDifI2cOk) return 1;
+
+  config_value = 0x7A;  // vstop
+  if (i2c_write(OV7670_ADDR_W, 0x1A, &config_value, 1) != kDifI2cOk) return 1;
+
+  config_value = 0x0A;  // vref
+  if (i2c_write(OV7670_ADDR_W, 0x03, &config_value, 1) != kDifI2cOk) return 1;
+
+  return 0;
+}
+
+/* ============================================================
+ * Test Main
+ * ============================================================ */
+int main(void) {
+  // Configure the pad control to set the correct mux for the camera interface
+  set_pad();
 
   PRINTF("=== Camera Test ===\n");
 
@@ -81,9 +113,10 @@ int main(void) {
     return -1;
   }
 
-  uint8_t who_am_i;
-  if (i2c_read(LSM6DSO_I2C_ADDR, LSM6DSO_WHO_AM_I, &who_am_i, 1) != kDifI2cOk)
-    PRINTF("[LSM6DSO] Error reading WHO_AM_I\n");
+  if (camera_i2c_init() != 0) {
+    PRINTF("[ERROR] Camera I2C initialization failed\n");
+    return -1;
+  }
 
   for (int i = 0; i < 1000; i++) rgb565[i] = 0x1234;
   // memset(rgb565, 0x55, sizeof(rgb565));
