@@ -100,10 +100,10 @@ module camera_if #(
   sync #(
       .STAGES(2)
   ) start_sync_i (
-      .clk_i     (cam_pclk),
+      .clk_i   (cam_pclk),
       .rst_ni,
-      .serial_i  (reg2hw.control.start.q),
-      .serial_o  (start_sync)
+      .serial_i(reg2hw.control.start.q),
+      .serial_o(start_sync)
   );
 
   // Enable: software armed the capture and we are inside a frame.
