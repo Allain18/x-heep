@@ -34,8 +34,9 @@
 // P16 (arduino_direct_iic_sda_io) -> SDA
 
 // i2c adress of the camera
-#define OV7670_ADDR_W 0x42
-#define OV7670_ADDR_R 0x43
+// Datasheet say it's 0x42 and 0x43 for write and read, but the LSB is the R/W
+// bit, so the address is 0x21
+#define OV7670_ADDR 0x21
 
 uint16_t rgb565[2000];
 // volatile uint16_t rgb565[1000];
@@ -75,25 +76,25 @@ void set_pad(void) {
 // https://github.com/EPFL-LAP/cs476/blob/main/virtualprototype/programs/support/src/ov7670.c
 uint8_t camera_i2c_init() {
   uint8_t config_value = 0x80;  // reset all registers to default values
-  if (i2c_write(OV7670_ADDR_W, 0x12, &config_value, 1) != kDifI2cOk) return 1;
+  if (i2c_write(OV7670_ADDR, 0x12, &config_value, 1) != kDifI2cOk) return 1;
 
   config_value = 0xF6;  // href
-  if (i2c_write(OV7670_ADDR_W, 0x32, &config_value, 1) != kDifI2cOk) return 1;
+  if (i2c_write(OV7670_ADDR, 0x32, &config_value, 1) != kDifI2cOk) return 1;
 
   config_value = 0x13;  // hstart
-  if (i2c_write(OV7670_ADDR_W, 0x17, &config_value, 1) != kDifI2cOk) return 1;
+  if (i2c_write(OV7670_ADDR, 0x17, &config_value, 1) != kDifI2cOk) return 1;
 
   config_value = 0x01;  // hstop
-  if (i2c_write(OV7670_ADDR_W, 0x18, &config_value, 1) != kDifI2cOk) return 1;
+  if (i2c_write(OV7670_ADDR, 0x18, &config_value, 1) != kDifI2cOk) return 1;
 
   config_value = 0x02;  // vstrt
-  if (i2c_write(OV7670_ADDR_W, 0x19, &config_value, 1) != kDifI2cOk) return 1;
+  if (i2c_write(OV7670_ADDR, 0x19, &config_value, 1) != kDifI2cOk) return 1;
 
   config_value = 0x7A;  // vstop
-  if (i2c_write(OV7670_ADDR_W, 0x1A, &config_value, 1) != kDifI2cOk) return 1;
+  if (i2c_write(OV7670_ADDR, 0x1A, &config_value, 1) != kDifI2cOk) return 1;
 
   config_value = 0x0A;  // vref
-  if (i2c_write(OV7670_ADDR_W, 0x03, &config_value, 1) != kDifI2cOk) return 1;
+  if (i2c_write(OV7670_ADDR, 0x03, &config_value, 1) != kDifI2cOk) return 1;
 
   return 0;
 }
@@ -112,6 +113,11 @@ int main(void) {
     PRINTF("[ERROR] I2C initialization failed\n");
     return -1;
   }
+
+  uint8_t producdt_id = 0;
+  i2c_read(OV7670_ADDR, 0x0A, &producdt_id, 1);
+
+  PRINTF("Camera product id: %x, should be 0x76\n", producdt_id);
 
   if (camera_i2c_init() != 0) {
     PRINTF("[ERROR] Camera I2C initialization failed\n");
