@@ -46,6 +46,10 @@ void set_pad(void) {
   pad_control.base_addr =
       mmio_region_from_addr((uintptr_t)PAD_CONTROL_START_ADDRESS);
   pad_control_set_mux(&pad_control,
+                      (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_0_REG_OFFSET), 2);
+  pad_control_set_mux(&pad_control,
+                      (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_1_REG_OFFSET), 2);
+  pad_control_set_mux(&pad_control,
                       (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_2_REG_OFFSET), 2);
   pad_control_set_mux(&pad_control,
                       (ptrdiff_t)(PAD_CONTROL_PAD_MUX_GPIO_3_REG_OFFSET), 2);
@@ -169,6 +173,7 @@ int main(void) {
 
   while (!dma_is_ready(0));
 
+  // if it's a7a7, UseTestPattern is probably set to 1
   PRINTF("%x\n", rgb565[2]);
 
   PRINTF("=== Test finished ===\n");
