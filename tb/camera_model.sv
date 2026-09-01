@@ -18,7 +18,7 @@ module camera_model #(
   logic [15:0] image_mem[0:H_ACTIVE*V_ACTIVE-1];
 
   initial begin
-    $readmemh("../../../tb/image.hex", image_mem);
+    $readmemh("../../../tb/test_image.hex", image_mem);
   end
 
   int x;
